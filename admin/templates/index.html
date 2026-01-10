@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodInsight Admin</title>
+    <script src="/static/htmx.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --accent: #0f3460;
+            --highlight: #e94560;
+            --text: #eaeaea;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --error: #f87171;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--highlight);
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        h2 {
+            color: var(--text);
+            margin: 20px 0 10px;
+            font-size: 1.2rem;
+        }
+
+        .status-bar {
+            background: var(--bg-secondary);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .status-indicator.offline {
+            background: var(--error);
+        }
+
+        .status-indicator.motion {
+            background: var(--warning);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .preview-container {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 10px;
+            display: inline-block;
+        }
+
+        .preview {
+            max-width: 100%;
+            width: 640px;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .inventory {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .item {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid transparent;
+        }
+
+        .item.in-stock {
+            border-color: var(--success);
+        }
+
+        .item.out-of-stock {
+            border-color: var(--error);
+            opacity: 0.6;
+        }
+
+        .nav-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: var(--accent);
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 4px;
+        }
+
+        .nav-link:hover {
+            background: var(--highlight);
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--accent);
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <h1>FoodInsight Edge Admin</h1>
+
+    <div class="status-bar" hx-get="/status" hx-trigger="every 2s" hx-swap="innerHTML">
+        <div class="status-item">
+            <div class="status-indicator {% if status.status == 'running' %}{% else %}offline{% endif %}"></div>
+            <span>Status: {{ status.status }}</span>
+        </div>
+        <div class="status-item">
+            <span>FPS: {{ status.fps }}</span>
+        </div>
+        <div class="status-item">
+            <span>Frames: {{ status.frame_count }}</span>
+        </div>
+        <div class="status-item">
+            <div class="status-indicator {% if status.motion_active %}motion{% else %}{% endif %}"></div>
+            <span>Motion: {% if status.motion_active %}Active{% else %}Idle{% endif %}</span>
+        </div>
+    </div>
+
+    <h2>Camera Preview</h2>
+    <div class="preview-container">
+        <img class="preview" src="/preview" alt="Camera feed">
+    </div>
+
+    <h2>Current Inventory</h2>
+    <div class="inventory" hx-get="/inventory-partial" hx-trigger="every 5s" hx-swap="innerHTML">
+        {% for item, count in status.inventory.items() %}
+        <div class="item {% if count > 0 %}in-stock{% else %}out-of-stock{% endif %}">
+            {{ item }}: {{ count }}
+        </div>
+        {% endfor %}
+        {% if not status.inventory %}
+        <div class="item">No items detected</div>
+        {% endif %}
+    </div>
+
+    <a class="nav-link" href="/roi">Configure Detection Region (ROI)</a>
+
+    <div class="footer">
+        <p>FoodInsight Edge Device | Machine ID: foodinsight-edge-001</p>
+        <p>Last Detection: <span id="last-detection">{{ status.last_detection or 'Never' }}</span></p>
+    </div>
+</body>
+</html>

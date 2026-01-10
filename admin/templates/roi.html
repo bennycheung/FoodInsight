@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROI Configuration - FoodInsight</title>
+    <script src="/static/htmx.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --accent: #0f3460;
+            --highlight: #e94560;
+            --text: #eaeaea;
+            --success: #4ade80;
+            --warning: #fbbf24;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--highlight);
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+
+        p {
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+
+        #roi-container {
+            position: relative;
+            display: inline-block;
+            background: var(--bg-secondary);
+            padding: 10px;
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+
+        #preview {
+            max-width: 100%;
+            width: 640px;
+            display: block;
+            border-radius: 4px;
+        }
+
+        #roi-overlay {
+            position: absolute;
+            border: 3px dashed var(--success);
+            background: rgba(74, 222, 128, 0.1);
+            pointer-events: none;
+            display: none;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #save-btn {
+            background: var(--success);
+            color: #000;
+        }
+
+        #save-btn:hover {
+            background: #22c55e;
+        }
+
+        #reset-btn {
+            background: var(--warning);
+            color: #000;
+        }
+
+        #reset-btn:hover {
+            background: #f59e0b;
+        }
+
+        .nav-link {
+            padding: 12px 24px;
+            background: var(--accent);
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 4px;
+        }
+
+        .nav-link:hover {
+            background: var(--highlight);
+        }
+
+        #coordinates {
+            margin-top: 15px;
+            padding: 10px 15px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        #message {
+            margin-top: 15px;
+            padding: 10px 15px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        #message.success {
+            display: block;
+            background: rgba(74, 222, 128, 0.2);
+            border: 1px solid var(--success);
+        }
+
+        #message.error {
+            display: block;
+            background: rgba(248, 113, 113, 0.2);
+            border: 1px solid #f87171;
+        }
+
+        .current-roi {
+            margin-top: 15px;
+            padding: 10px 15px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            border-left: 3px solid var(--success);
+        }
+    </style>
+</head>
+<body>
+    <h1>Configure Detection Region</h1>
+    <p>Click and drag to select the snack shelf area. Only this region will be processed for detection.</p>
+
+    <div id="roi-container">
+        <img id="preview" src="/preview/snapshot" alt="Camera snapshot">
+        <div id="roi-overlay"></div>
+    </div>
+
+    <div id="coordinates">ROI: <span id="roi-coords">Click and drag to select</span></div>
+
+    {% if roi %}
+    <div class="current-roi">
+        Current ROI: ({{ roi.x1 }}, {{ roi.y1 }}) to ({{ roi.x2 }}, {{ roi.y2 }})
+    </div>
+    {% endif %}
+
+    <div class="controls">
+        <button id="save-btn">Save Configuration</button>
+        <button id="reset-btn">Reset to Full Frame</button>
+        <a class="nav-link" href="/">Back to Dashboard</a>
+    </div>
+
+    <div id="message"></div>
+
+    <script>
+        let startX, startY, isDrawing = false;
+        let roiX1, roiY1, roiX2, roiY2;
+        const container = document.getElementById('roi-container');
+        const overlay = document.getElementById('roi-overlay');
+        const preview = document.getElementById('preview');
+        const coordsDisplay = document.getElementById('roi-coords');
+        const messageEl = document.getElementById('message');
+
+        preview.addEventListener('mousedown', (e) => {
+            const rect = preview.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            isDrawing = true;
+            overlay.style.display = 'block';
+            overlay.style.left = startX + 'px';
+            overlay.style.top = startY + 'px';
+            overlay.style.width = '0px';
+            overlay.style.height = '0px';
+        });
+
+        preview.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const rect = preview.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+
+            const left = Math.min(startX, currentX);
+            const top = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
+
+            overlay.style.left = left + 'px';
+            overlay.style.top = top + 'px';
+            overlay.style.width = width + 'px';
+            overlay.style.height = height + 'px';
+
+            updateCoordinates(left, top, left + width, top + height);
+        });
+
+        preview.addEventListener('mouseup', (e) => {
+            isDrawing = false;
+        });
+
+        function updateCoordinates(x1, y1, x2, y2) {
+            // Scale from display to actual frame coordinates
+            const scale = preview.naturalWidth / preview.clientWidth;
+            roiX1 = Math.round(x1 * scale);
+            roiY1 = Math.round(y1 * scale);
+            roiX2 = Math.round(x2 * scale);
+            roiY2 = Math.round(y2 * scale);
+
+            coordsDisplay.textContent = `(${roiX1}, ${roiY1}) to (${roiX2}, ${roiY2})`;
+        }
+
+        function showMessage(text, type) {
+            messageEl.textContent = text;
+            messageEl.className = type;
+            setTimeout(() => {
+                messageEl.className = '';
+            }, 3000);
+        }
+
+        document.getElementById('save-btn').addEventListener('click', async () => {
+            if (!roiX1 && roiX1 !== 0) {
+                showMessage('Please draw a region first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/roi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({x1: roiX1, y1: roiY1, x2: roiX2, y2: roiY2})
+                });
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    showMessage('ROI saved successfully!', 'success');
+                } else {
+                    showMessage(data.message || 'Failed to save', 'error');
+                }
+            } catch (e) {
+                showMessage('Error saving ROI: ' + e.message, 'error');
+            }
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/roi/reset', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    overlay.style.display = 'none';
+                    coordsDisplay.textContent = 'Full frame (no ROI)';
+                    showMessage('ROI reset to full frame', 'success');
+                } else {
+                    showMessage(data.message || 'Failed to reset', 'error');
+                }
+            } catch (e) {
+                showMessage('Error resetting ROI: ' + e.message, 'error');
+            }
+        });
+
+        // Refresh snapshot periodically
+        setInterval(() => {
+            if (!isDrawing) {
+                preview.src = '/preview/snapshot?' + Date.now();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

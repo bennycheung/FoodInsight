@@ -1,0 +1,30 @@
+[Unit]
+Description=FoodInsight Edge Detection Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/foodinsight
+Environment="PATH=/opt/foodinsight/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/opt/foodinsight/.venv/bin/python /opt/foodinsight/main.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/var/log/foodinsight/edge.log
+StandardError=append:/var/log/foodinsight/edge.log
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/foodinsight /var/log/foodinsight
+PrivateTmp=true
+
+# Allow camera access
+SupplementaryGroups=video
+
+[Install]
+WantedBy=multi-user.target
