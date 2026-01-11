@@ -96,9 +96,28 @@ pip install ultralytics flask httpx opencv-python numpy
 
 # Run in development mode (port 8080)
 python run_dev.py
+
+# Or use a custom config file
+python run_dev.py --config custom_config.json
+python run_dev.py -c test_config.json
 ```
 
 Open http://localhost:8080 to access the admin portal.
+
+**Configuration file format (`dev_config.json`):**
+```json
+{
+  "machine_id": "breakroom-1",
+  "model_path": "/path/to/models/yolo11n_ncnn_model",
+  "input_size": 640,
+  "admin_port": 8080,
+  "camera_index": 1,
+  "api_url": "http://localhost:8000",
+  "allowed_classes": ["bottle", "cup", "banana", "apple", "pizza", "donut"]
+}
+```
+
+Create different config files for different models and class sets (e.g., `food_config.json`, `all_classes_config.json`).
 
 **What works in dev mode:**
 - Camera capture via OpenCV (built-in webcam or USB)
@@ -125,6 +144,85 @@ pkill -f "python run_dev.py"
 ```
 
 **macOS camera permission:** Grant Terminal/IDE camera access in **System Preferences > Privacy & Security > Camera**.
+
+---
+
+### Custom Model Training & Deployment
+
+Train a custom model on your own dataset (e.g., UECFOOD100 Japanese food) and deploy it:
+
+#### 1. Train the Model
+
+```bash
+cd datasets
+
+# Convert dataset to YOLO format (if using UEC FOOD)
+python convert_uec_to_yolo.py UECFOOD100 --output UECFOOD100_yolo
+
+# Train on the dataset
+python train.py --data UECFOOD100_yolo/data.yaml --epochs 100 --device mps
+
+# Training outputs to: datasets/runs/detect/train/weights/best.pt
+```
+
+#### 2. Deploy the Trained Model
+
+After training completes, export and deploy the model:
+
+```bash
+cd /path/to/FoodInsight
+
+# Option A: Use the deployment script (recommended)
+./scripts/deploy_model.sh datasets/runs/detect/train/weights/best.pt uecfood100
+
+# Option B: Manual steps
+cd datasets
+python train.py --export runs/detect/train/weights/best.pt --format ncnn
+cp -r runs/detect/train/weights/best_ncnn_model ../models/uecfood100_ncnn_model
+```
+
+The deployment script:
+1. Exports `.pt` model to NCNN format (optimized for CPU/Raspberry Pi)
+2. Copies the exported model to `models/` directory
+3. Prints usage instructions
+
+#### 3. Create a Config File
+
+Create a config file with your model's class names (see `uecfood100_config.json` as example):
+
+```json
+{
+  "machine_id": "breakroom-1",
+  "model_path": "/path/to/models/uecfood100_ncnn_model",
+  "input_size": 640,
+  "admin_port": 8080,
+  "camera_index": 1,
+  "api_url": "http://localhost:8000",
+  "allowed_classes": ["rice", "sushi", "ramen noodle", "..."]
+}
+```
+
+**Important:** The `allowed_classes` must match the class names from your training dataset's `data.yaml`.
+
+#### 4. Run with Custom Model
+
+```bash
+# Run detection service with custom model
+python run_dev.py --config uecfood100_config.json
+
+# Or start all services
+./scripts/start-dev.sh --config uecfood100_config.json
+```
+
+#### Model Formats
+
+| Format | Use Case | Size | Speed |
+|--------|----------|------|-------|
+| `.pt` | Training, validation | Original | GPU optimized |
+| NCNN | Raspberry Pi, CPU inference | ~Same | CPU optimized |
+| ONNX | Cross-platform, TensorRT | ~Same | Flexible |
+
+For Raspberry Pi deployment, always use NCNN format.
 
 ---
 
@@ -242,7 +340,15 @@ Three services available for local development testing:
 
 **Start all services:**
 ```bash
+# Default config (dev_config.json)
 ./scripts/start-dev.sh
+
+# Custom config file
+./scripts/start-dev.sh --config custom_config.json
+./scripts/start-dev.sh -c food_config.json
+
+# Override camera (env var)
+CAMERA_INDEX=0 ./scripts/start-dev.sh
 ```
 
 **Stop all services:**
@@ -261,7 +367,7 @@ cd app && bun run dev
 
 # Terminal 3: Detection + Admin Portal
 source .venv/bin/activate
-CAMERA_INDEX=1 python run_dev.py
+CAMERA_INDEX=1 python run_dev.py --config dev_config.json
 ```
 
 ### Unit Tests

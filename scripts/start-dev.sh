@@ -1,16 +1,39 @@
 #!/bin/bash
 # Start all FoodInsight development services
 # Run from project root: ./scripts/start-dev.sh
+#
+# Usage:
+#   ./scripts/start-dev.sh                        # Uses dev_config.json (default)
+#   ./scripts/start-dev.sh --config custom.json   # Uses custom config file
+#   ./scripts/start-dev.sh -c prod_config.json    # Short form
+#   CAMERA_INDEX=0 ./scripts/start-dev.sh         # Override camera index
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# Parse arguments
+CONFIG_FILE="dev_config.json"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -c|--config)
+            CONFIG_FILE="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [-c|--config CONFIG_FILE]"
+            exit 1
+            ;;
+    esac
+done
+
 cd "$PROJECT_ROOT"
 
 echo "Starting FoodInsight Development Services..."
 echo "============================================="
+echo "Config file: $CONFIG_FILE"
 
 # Check if services are already running
 if lsof -i :8000 -i :5173 -i :8080 2>/dev/null | grep -q LISTEN; then
@@ -57,7 +80,7 @@ echo "Vue PWA running (PID: $VUE_PID)"
 echo ""
 echo "[3/3] Starting Detection Service on port 8080..."
 source .venv/bin/activate
-CAMERA_INDEX=${CAMERA_INDEX:-1} python run_dev.py &
+CAMERA_INDEX=${CAMERA_INDEX:-1} python run_dev.py --config "$CONFIG_FILE" &
 DETECTION_PID=$!
 
 # Wait for detection service to be ready

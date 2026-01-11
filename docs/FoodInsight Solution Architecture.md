@@ -858,10 +858,18 @@ foodinsight-app/
 For testing before Raspberry Pi deployment:
 
 ```bash
-python run_dev.py  # Runs on port 8080, uses built-in webcam (index 1)
+python run_dev.py  # Runs on port 8080, uses dev_config.json
 
-# To use iPhone via Continuity Camera instead:
-CAMERA_INDEX=0 python run_dev.py
+# Custom config file for different models/classes
+python run_dev.py --config custom_config.json
+python run_dev.py -c food_only_config.json
+
+# Override camera via environment variable
+CAMERA_INDEX=0 python run_dev.py  # iPhone via Continuity Camera
+
+# Or use the all-in-one script
+./scripts/start-dev.sh                        # Default config
+./scripts/start-dev.sh --config custom.json   # Custom config
 ```
 
 | Component | Development Mode |
@@ -869,9 +877,21 @@ CAMERA_INDEX=0 python run_dev.py
 | Camera | OpenCV VideoCapture (configurable index) |
 | Camera Index | `CAMERA_INDEX` env var (0=iPhone, 1=built-in webcam) |
 | Admin Port | 8080 (no sudo) |
-| Config Path | `./dev_config.json` |
+| Config Path | `--config` argument (default: `dev_config.json`) |
 | Log Path | `./logs/` |
 | Model | Optional (mock mode if absent) |
+
+**Configuration file options:**
+| Option | Type | Description |
+|--------|------|-------------|
+| `machine_id` | string | Unique device identifier |
+| `model_path` | string | Path to YOLO NCNN model |
+| `input_size` | int | Model input size (320, 640) |
+| `admin_port` | int | Flask admin portal port |
+| `camera_index` | int | OpenCV camera index |
+| `api_url` | string | Backend API URL |
+| `allowed_classes` | array | Classes to detect (empty = all) |
+| `motion_threshold` | float | Motion sensitivity (default: 0.008) |
 
 ### Budget Tier (Raspberry Pi 4)
 
@@ -1115,8 +1135,10 @@ All 23 functional requirements are mapped to components. All must-have NFRs have
 5. Vue store updated to match SQLite backend response format (array vs dictionary)
 
 **Development Features:**
+- `--config` argument to specify different config files for models/classes (`python run_dev.py -c custom.json`)
 - `camera_index` setting to choose between cameras (0=iPhone, 1=built-in webcam on Mac)
-- Set via `CAMERA_INDEX` environment variable or in `dev_config.json`
+- `CAMERA_INDEX` environment variable overrides config file setting
+- `./scripts/start-dev.sh --config custom.json` starts all services with custom config
 - Dev scripts: `scripts/start-dev.sh` and `scripts/stop-dev.sh` for easy local testing
 
 ---

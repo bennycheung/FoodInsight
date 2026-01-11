@@ -2,9 +2,16 @@
 """Development runner for testing FoodInsight on Mac/Linux desktop.
 
 This script adjusts paths and settings for local development testing.
+
+Usage:
+    python run_dev.py                        # Uses dev_config.json (default)
+    python run_dev.py --config custom.json   # Uses custom config file
+    python run_dev.py -c prod_config.json    # Short form
 """
 
+import argparse
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -15,8 +22,43 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Run FoodInsight in development mode",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+    python run_dev.py                        # Uses dev_config.json
+    python run_dev.py --config custom.json   # Uses custom config file
+    python run_dev.py -c prod_config.json    # Short form
+        """,
+    )
+    parser.add_argument(
+        "-c", "--config",
+        type=str,
+        default="dev_config.json",
+        help="Path to configuration file (default: dev_config.json)",
+    )
+    return parser.parse_args()
+
+
+def load_config(config_path: Path) -> dict:
+    """Load configuration from JSON file."""
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    with open(config_path) as f:
+        return json.load(f)
+
+
+# Parse args early to get config path
+args = parse_args()
+config_path = PROJECT_ROOT / args.config if not Path(args.config).is_absolute() else Path(args.config)
+
 # Override config paths for development
-os.environ["FOODINSIGHT_CONFIG_PATH"] = str(PROJECT_ROOT / "dev_config.json")
+os.environ["FOODINSIGHT_CONFIG_PATH"] = str(config_path)
 os.environ["FOODINSIGHT_LOG_DIR"] = str(PROJECT_ROOT / "logs")
 
 # Create logs directory
@@ -34,12 +76,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def patch_config_paths():
+def patch_config_paths(config_file: Path):
     """Patch config module to use dev paths."""
     from config import settings
 
     # Override paths
-    settings.CONFIG_PATH = PROJECT_ROOT / "dev_config.json"
+    settings.CONFIG_PATH = config_file
     settings.DEFAULT_MODEL_PATH = str(PROJECT_ROOT / "models" / "yolo11n_ncnn_model")
 
 
@@ -49,51 +91,38 @@ def main():
     logger.info("FoodInsight Development Mode")
     logger.info("=" * 60)
 
-    patch_config_paths()
+    patch_config_paths(config_path)
 
     from admin import create_app, update_frame, update_status
     from api import LocalAPIClient
     from config import Settings
     from detection import DetectionService
 
-    # Create dev settings
-    # Camera index: 0 = first camera (often iPhone), 1 = second (often built-in webcam)
-    # Change this to switch cameras on Mac
-    camera_index = int(os.environ.get("CAMERA_INDEX", "1"))  # Default to built-in webcam
+    # Load configuration from file
+    logger.info(f"Loading config from: {config_path}")
+    config = load_config(config_path)
 
+    # Camera index: env var overrides config file
+    # 0 = first camera (often iPhone), 1 = second (often built-in webcam)
+    camera_index = int(os.environ.get("CAMERA_INDEX", config.get("camera_index", 1)))
+
+    # Create settings from config file
     settings = Settings(
-        machine_id="breakroom-1",  # Match mock data machine_id
-        model_path=str(PROJECT_ROOT / "models" / "yolo11n_ncnn_model"),
-        input_size=640,
-        process_every_n_frames=1,
-        motion_threshold=0.008,  # High sensitivity for item detection
-        admin_port=8080,  # Use non-privileged port
-        api_url="http://localhost:8000",  # Local backend
-        camera_index=camera_index,  # 0=iPhone, 1=built-in webcam (typically)
-        # Filter to only report these classes (empty list = all classes)
-        # Default food-related COCO classes for snack detection
-        allowed_classes=[
-            "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl",
-            "banana", "apple", "sandwich", "orange", "broccoli", "carrot",
-            "hot dog", "pizza", "donut", "cake",
-        ],
+        machine_id=config.get("machine_id", "breakroom-1"),
+        model_path=config.get("model_path", str(PROJECT_ROOT / "models" / "yolo11n_ncnn_model")),
+        input_size=config.get("input_size", 640),
+        process_every_n_frames=config.get("process_every_n_frames", 1),
+        motion_threshold=config.get("motion_threshold", 0.008),
+        admin_port=config.get("admin_port", 8080),
+        api_url=config.get("api_url", "http://localhost:8000"),
+        camera_index=camera_index,
+        allowed_classes=config.get("allowed_classes", []),
     )
-
-    # Save dev config
-    import json
-    config_path = PROJECT_ROOT / "dev_config.json"
-    config_path.write_text(json.dumps({
-        "machine_id": settings.machine_id,
-        "model_path": settings.model_path,
-        "input_size": settings.input_size,
-        "admin_port": settings.admin_port,
-        "camera_index": settings.camera_index,
-        "allowed_classes": settings.allowed_classes,
-    }, indent=2))
 
     logger.info(f"Platform: macOS development mode")
     logger.info(f"Config: {config_path}")
     logger.info(f"Camera index: {camera_index} (set CAMERA_INDEX=0 for iPhone, =1 for built-in)")
+    logger.info(f"Allowed classes: {len(settings.allowed_classes)} classes configured")
     logger.info(f"Admin portal: http://localhost:{settings.admin_port}")
 
     # Check for model
