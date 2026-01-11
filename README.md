@@ -377,8 +377,8 @@ FoodInsight/
 
 - [Server README](server/README.md) - FastAPI backend
 - [App README](app/README.md) - Vue 3 PWA
-- [PRD](../KnowledgeBase/Projects/FoodInsight/FoodInsight%20PRD.md) - Requirements
-- [Architecture](../KnowledgeBase/Projects/FoodInsight/FoodInsight%20Solution%20Architecture.md) - Technical design
+- [PRD](docs/FoodInsight%20PRD.md) - Requirements
+- [Architecture](docs/FoodInsight%20Solution%20Architecture.md) - Technical design
 
 ## Next Steps
 
