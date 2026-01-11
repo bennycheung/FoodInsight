@@ -58,6 +58,7 @@ dev_config.json
 # Node.js (for Vue app)
 app/node_modules/
 app/dist/
+app/dev-dist/
 app/.vite/
 
 # Server venv
