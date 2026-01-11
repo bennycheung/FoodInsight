@@ -20,6 +20,9 @@ build/
 yolo11n_ncnn_model/
 models/
 
+# Training datasets
+datasets/
+
 # Ultralytics runs/cache
 runs/
 .cache/
