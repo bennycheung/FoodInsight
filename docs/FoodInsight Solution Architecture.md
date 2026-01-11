@@ -1,9 +1,9 @@
 # FoodInsight Solution Architecture
 
 **Author:** Winston (Architect) via BMAD
-**Date:** 2026-01-10
-**Version:** 1.5
-**Status:** IMPLEMENTED
+**Date:** 2026-01-11
+**Version:** 2.0
+**Status:** IMPLEMENTED (Local-First)
 **PRD Reference:** [[FoodInsight PRD]]
 **Implementation:** `/Users/bcheung/dev/FoodInsight/`
 
@@ -11,15 +11,16 @@
 
 ## Executive Summary
 
-FoodInsight is a smart snack inventory monitoring system using edge AI and cloud backend. This solution architecture defines the technical implementation for a Level 2 Internal Tool Prototype targeting office break room deployment.
+FoodInsight is a smart snack inventory monitoring system using edge AI and local backend. This solution architecture defines the technical implementation for a Level 2 Internal Tool Prototype targeting office break room deployment.
 
-**Architecture Pattern:** Edge-First Hybrid (Embedded + Backend + PWA)
+**Architecture Pattern:** Local-First (Embedded + Local Backend + PWA)
 
 **Key Design Decisions:**
-- **Edge-first processing** - All detection runs locally on RPi 4/5, only metadata sent to cloud
-- **Multi-platform support** - RPi 4 ($55) for budget, RPi 5 ($80) for performance
+- **Local-first processing** - All detection and storage runs locally on device (no cloud required)
+- **Multi-platform support** - RPi 4 ($55) for budget, RPi 5 ($80) for performance, macOS for development
 - **CPU-only prototype** - No Hailo accelerator for MVP (RPi 5 can upgrade later)
-- **Privacy-by-design** - ROI masking, no images transmitted
+- **Privacy-by-design** - ROI masking, no images transmitted, all data stays local
+- **SQLite database** - Simple, reliable, zero-config local storage
 - **Real-time consumer view** - PWA with polling (WebSocket deferred to Phase 2)
 
 ---
@@ -85,19 +86,25 @@ PLATFORM_CONFIGS = {
     "rpi5": PlatformConfig(
         input_size=640,           # Full resolution
         process_every_n_frames=1, # Every frame
-        motion_threshold=0.02,    # Standard sensitivity
+        motion_threshold=0.008,   # High sensitivity for item detection
         batch_timeout=1.0         # 1 second batching
     ),
     "rpi4": PlatformConfig(
         input_size=320,           # Reduced for performance
         process_every_n_frames=3, # Every 3rd frame
-        motion_threshold=0.015,   # More sensitive (compensate for skipping)
+        motion_threshold=0.006,   # Higher sensitivity (compensate for skipping)
         batch_timeout=2.0         # Longer batch window
+    ),
+    "desktop": PlatformConfig(
+        input_size=640,           # Full resolution
+        process_every_n_frames=1, # Every frame
+        motion_threshold=0.008,   # High sensitivity for item detection
+        batch_timeout=1.0         # 1 second batching
     ),
     "unknown": PlatformConfig(
         input_size=320,           # Conservative default
         process_every_n_frames=2,
-        motion_threshold=0.02,
+        motion_threshold=0.008,   # High sensitivity for item detection
         batch_timeout=1.5
     )
 }
@@ -110,22 +117,22 @@ def get_config() -> PlatformConfig:
 
 **Performance Impact by Platform:**
 
-| Setting | RPi 5 Value | RPi 4 Value | Impact |
-|---------|-------------|-------------|--------|
-| Input size | 640×640 | 320×320 | 4× fewer pixels, ~2× faster inference |
-| Frame skip | 1 (none) | 3 | 3× less CPU load, 3× latency |
-| Motion threshold | 0.02 | 0.015 | More sensitive to compensate for skipping |
-| Expected FPS | 4-6 | 1-3 | Sufficient for break room traffic |
+| Setting | RPi 5 Value | RPi 4 Value | Desktop Value | Impact |
+|---------|-------------|-------------|---------------|--------|
+| Input size | 640×640 | 320×320 | 640×640 | 4× fewer pixels on RPi 4, ~2× faster inference |
+| Frame skip | 1 (none) | 3 | 1 (none) | 3× less CPU load on RPi 4, 3× latency |
+| Motion threshold | 0.008 | 0.006 | 0.008 | High sensitivity for item detection |
+| Expected FPS | 4-6 | 1-3 | 10+ | Sufficient for break room traffic |
 
-### Cloud Backend
+### Local Backend
 
 | Layer | Technology | Version | Rationale |
 |-------|------------|---------|-----------|
 | **Framework** | FastAPI | 0.115+ | Async, auto-docs, Pydantic |
 | **Runtime** | Python | 3.11+ | Performance, typing |
-| **Database** | Firestore | - | Serverless, real-time capable |
-| **Auth** | Bearer Token | - | Simple device auth |
-| **Hosting** | GCP Cloud Run | - | Serverless, auto-scale |
+| **Database** | SQLite + SQLAlchemy | 2.0+ | Local-first, zero-config, reliable |
+| **Auth** | Basic Auth | - | Admin API protection |
+| **Hosting** | Local (same device) | - | No cloud dependency |
 | **Package Manager** | uv | Latest | Fast Python dependency management |
 
 ### Client App (PWA)
@@ -148,31 +155,36 @@ def get_config() -> PlatformConfig:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        FoodInsight System                            │
+│                    FoodInsight Device (Local-First)                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  ┌─────────────────┐          ┌─────────────────────────────────┐   │
-│  │   EDGE LAYER    │          │         CLOUD LAYER             │   │
-│  │                 │          │                                 │   │
-│  │  ┌───────────┐  │  REST    │  ┌─────────────┐               │   │
-│  │  │ RPi 4/5   │  │  (JSON)  │  │ FastAPI     │               │   │
-│  │  │ + Camera  │──┼─────────►│  │ Cloud Run   │               │   │
-│  │  │           │  │  Delta   │  └──────┬──────┘               │   │
-│  │  │ YOLO11n   │  │  Updates │         │                      │   │
-│  │  │ ByteTrack │  │          │         ▼                      │   │
-│  │  └───────────┘  │          │  ┌─────────────┐               │   │
-│  │        │        │          │  │ Firestore   │               │   │
-│  │        │ Local  │          │  │ Database    │               │   │
-│  │        ▼        │          │  └──────┬──────┘               │   │
-│  │  ┌───────────┐  │          │         │                      │   │
-│  │  │ Admin     │  │          │         │ REST                 │   │
-│  │  │ Portal    │  │          │         ▼                      │   │
-│  │  │ (Flask)   │  │          │  ┌─────────────┐               │   │
-│  │  └───────────┘  │          │  │ PWA Client  │               │   │
-│  │   Port 80       │          │  │ (Vue 3)     │               │   │
-│  │   LAN Only      │          │  │ CF Pages    │               │   │
-│  └─────────────────┘          │  └─────────────┘               │   │
-│                               └─────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │                      EDGE DEVICE LAYER                       │    │
+│  │                                                              │    │
+│  │  ┌───────────┐    ┌───────────┐    ┌───────────────────┐   │    │
+│  │  │ Camera    │───►│ Detection │───►│ Inventory Tracker │   │    │
+│  │  │ Input     │    │ Pipeline  │    │                   │   │    │
+│  │  └───────────┘    │ YOLO11n   │    └─────────┬─────────┘   │    │
+│  │                   │ ByteTrack │              │              │    │
+│  │                   └───────────┘              │              │    │
+│  │                                              ▼              │    │
+│  │  ┌───────────┐    ┌───────────┐    ┌───────────────────┐   │    │
+│  │  │ Admin     │◄──►│ FastAPI   │◄──►│ SQLite Database   │   │    │
+│  │  │ Portal    │    │ Backend   │    │ (foodinsight.db)  │   │    │
+│  │  │ (Flask)   │    │ Port 8000 │    └───────────────────┘   │    │
+│  │  │ Port 8080 │    └─────┬─────┘                             │    │
+│  │  └───────────┘          │                                   │    │
+│  │   LAN Only              │                                   │    │
+│  └─────────────────────────┼───────────────────────────────────┘    │
+│                            │                                         │
+│                            │ REST API                                │
+│                            ▼                                         │
+│                   ┌─────────────────┐                                │
+│                   │   Consumer PWA  │                                │
+│                   │   (Vue 3)       │                                │
+│                   │   Phone/Browser │                                │
+│                   └─────────────────┘                                │
+│                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -194,8 +206,8 @@ Camera (30 FPS) ──► Motion Check ──► YOLO11n (4-6 FPS) ──► Byt
                                                             │
                                                             ▼
                                                    ┌──────────────────┐
-                                                   │ Firestore        │
-                                                   │ Update           │
+                                                   │ SQLite Database  │
+                                                   │ (local storage)  │
                                                    └────────┬─────────┘
                                                             │
                                                             ▼
@@ -316,23 +328,29 @@ def set_roi():
     return {"status": "ok"}
 ```
 
-### Component 3: Cloud Backend (FastAPI)
+### Component 3: Local Backend (FastAPI + SQLite)
 
 **Epic Mapping:** Epic 2 (E2-S1 through E2-S4)
 
 **Responsibilities:**
-- Receive inventory updates from edge devices
-- Store data in Firestore
+- Receive inventory updates from edge detection service
+- Store data in SQLite (local database)
 - Serve inventory API for PWA
-- Device authentication (Bearer token)
+- Admin API with Basic authentication
 
 **API Endpoints:**
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `POST /inventory/update` | POST | Bearer | Edge device pushes delta |
-| `GET /inventory/{machine_id}` | GET | None | Get current inventory |
+| `POST /inventory/update` | POST | None | Edge device pushes delta |
+| `POST /inventory/event` | POST | None | Log detection event |
+| `GET /inventory` | GET | None | Get current inventory |
+| `GET /inventory/events` | GET | None | Get recent events |
 | `GET /health` | GET | None | Health check |
+| `GET /ready` | GET | None | Readiness check (DB status) |
+| `GET /admin/status` | GET | Basic | Device status |
+| `GET /admin/config` | GET/PUT | Basic | Configuration |
+| `GET /admin/users` | GET/POST/DELETE | Basic | User management |
 
 **Data Models:**
 
@@ -343,25 +361,25 @@ from datetime import datetime
 
 class InventoryItem(BaseModel):
     item_name: str
+    display_name: str | None = None
     count: int = Field(ge=0)
     confidence: float = Field(ge=0.0, le=1.0)
+    last_updated: datetime | None = None
 
 class InventoryUpdate(BaseModel):
-    machine_id: str
-    timestamp: datetime
-    inventory: dict[str, InventoryItem]
-    events: list[InventoryEvent] = []
+    items: dict[str, int]  # item_name -> count
+    confidences: dict[str, float] | None = None
 
 class InventoryResponse(BaseModel):
-    machine_id: str
+    device_id: str
     location: str
     items: list[InventoryItem]
-    last_updated: datetime
+    last_updated: datetime | None
 ```
 
 **NFR Compliance:**
-- NFR2 (API response <200ms): FastAPI async + Firestore
-- NFR6 (Cloud cost <$10/mo): Cloud Run free tier + Firestore free tier
+- NFR2 (API response <200ms): FastAPI async + SQLite
+- NFR6 (Cloud cost $0/mo): Local SQLite, no cloud dependency
 
 ### Component 4: Consumer PWA
 
@@ -440,46 +458,85 @@ export const useInventoryStore = defineStore('inventory', {
 
 ## Data Architecture
 
-### Firestore Schema
+### SQLite Schema
 
-```
-companies/
-└── {company_id}/
-    ├── machines/
-    │   └── {machine_id}/
-    │       ├── name: string
-    │       ├── location: string
-    │       ├── status: "online" | "offline"
-    │       ├── last_seen: timestamp
-    │       └── config: {
-    │           api_key: string
-    │           roi: { x1, y1, x2, y2 }
-    │         }
-    │
-    └── inventory/
-        └── {machine_id}/
-            ├── items: {
-            │   [item_name]: {
-            │     count: number
-            │     confidence: number
-            │     last_updated: timestamp
-            │   }
-            │ }
-            └── last_updated: timestamp
+The local SQLite database (`data/foodinsight.db`) uses the following schema:
+
+```sql
+-- Device configuration and status
+CREATE TABLE config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),  -- Singleton row
+    device_id TEXT NOT NULL DEFAULT 'breakroom-001',
+    location TEXT NOT NULL DEFAULT 'Break Room',
+    status TEXT NOT NULL DEFAULT 'online',
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    roi_x1 REAL, roi_y1 REAL, roi_x2 REAL, roi_y2 REAL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Current inventory state
+CREATE TABLE inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_name TEXT NOT NULL UNIQUE,
+    display_name TEXT,
+    count INTEGER NOT NULL DEFAULT 0,
+    confidence REAL DEFAULT 0.0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Detection events log
+CREATE TABLE events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,  -- 'SNACK_TAKEN' | 'SNACK_ADDED'
+    item_name TEXT NOT NULL,
+    count_before INTEGER NOT NULL,
+    count_after INTEGER NOT NULL,
+    confidence REAL DEFAULT 0.0,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_name) REFERENCES inventory(item_name)
+);
+
+-- Admin users for Basic auth
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Alert rules (Phase 2)
+CREATE TABLE alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_name TEXT,  -- NULL for all items
+    threshold INTEGER NOT NULL,
+    alert_type TEXT NOT NULL,  -- 'low_stock' | 'out_of_stock'
+    enabled INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Audit log for admin actions
+CREATE TABLE audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance
+CREATE INDEX idx_events_timestamp ON events(timestamp);
+CREATE INDEX idx_events_item ON events(item_name);
+CREATE INDEX idx_inventory_item ON inventory(item_name);
 ```
 
-### Event Log (Optional - Phase 2)
+### Data Retention
 
-```
-companies/{company_id}/events/
-└── {event_id}/
-    ├── type: "SNACK_TAKEN" | "SNACK_ADDED"
-    ├── item: string
-    ├── machine_id: string
-    ├── timestamp: timestamp
-    ├── count_before: number
-    └── count_after: number
-```
+- **Inventory**: Current state only, updated in place
+- **Events**: 30-day retention (cleanup job in Phase 2)
+- **Audit Log**: 90-day retention
 
 ---
 
@@ -532,22 +589,24 @@ companies/{company_id}/events/
 
 **Mitigation:** Edge admin is isolated component; framework difference acceptable.
 
-### ADR-004: Firestore vs SQLite for Prototype
+### ADR-004: SQLite for Local-First Architecture
 
-**Status:** Accepted
+**Status:** Accepted (Revised)
 
-**Context:** Prototype could use local SQLite or cloud Firestore.
+**Context:** Prototype originally considered cloud Firestore, but local-first design provides better reliability and zero cloud cost.
 
-**Decision:** Use Firestore from the start.
+**Decision:** Use SQLite for all data storage.
 
 **Consequences:**
-- (+) No database management required
-- (+) Real-time capabilities available for Phase 2
-- (+) Multi-device ready when scaling
-- (-) Requires network connectivity
-- (-) Small cost (likely within free tier)
+- (+) Zero cloud dependency - works completely offline
+- (+) Zero infrastructure cost ($0/month)
+- (+) Simple deployment - single file database
+- (+) Full data ownership - no third-party data storage
+- (+) Faster development - no cloud configuration needed
+- (-) Multi-device sync requires additional work (Phase 2+)
+- (-) No built-in real-time capabilities
 
-**Mitigation:** Free tier covers prototype scale; offline mode handled by edge device buffering.
+**Mitigation:** Single-device prototype doesn't need multi-device sync; PWA polling provides adequate refresh rate for break room use case.
 
 ### ADR-005: Raspberry Pi 4 Support
 
@@ -584,33 +643,40 @@ companies/{company_id}/events/
 
 ```
 ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-│ Edge Device │         │  FastAPI    │         │  Firestore  │
+│ Admin User  │         │  FastAPI    │         │   SQLite    │
 └──────┬──────┘         └──────┬──────┘         └──────┬──────┘
        │                       │                       │
-       │  POST /inventory      │                       │
-       │  Bearer: {api_key}    │                       │
+       │  GET /admin/status    │                       │
+       │  Auth: Basic base64   │                       │
        │──────────────────────►│                       │
        │                       │                       │
-       │                       │  Verify api_key       │
+       │                       │  Verify credentials   │
        │                       │──────────────────────►│
        │                       │                       │
        │                       │◄──────────────────────│
-       │                       │  Company config       │
+       │                       │  User record          │
        │                       │                       │
        │  200 OK / 401 Unauth  │                       │
        │◄──────────────────────│                       │
        │                       │                       │
+
+Public endpoints (no auth):
+- GET /inventory - Consumer PWA reads inventory
+- POST /inventory/update - Edge detection pushes updates
+- GET /health, /ready, /info - Health checks
 ```
 
 ### Security Checklist
 
 | Concern | Mitigation |
 |---------|------------|
-| **Edge device auth** | Bearer token stored in env, verified against Firestore |
+| **Admin API auth** | HTTP Basic auth with bcrypt-hashed passwords in SQLite |
 | **Admin portal access** | Local network only (not exposed to internet) |
-| **API exposure** | Public inventory read is intentional (no auth for consumers) |
-| **Data privacy** | Only counts transmitted, never images |
-| **ROI config** | Stored locally on edge device, not in cloud |
+| **Public API** | Read-only inventory intentional (no auth for consumers) |
+| **Data privacy** | Only counts stored, never images |
+| **ROI config** | Stored locally in config table |
+| **Default credentials** | `admin`/`admin` - change after first login |
+| **Audit trail** | Admin actions logged to audit_log table |
 
 ---
 
@@ -638,13 +704,13 @@ E1-S1 ──► E1-S2 ──► E1-S4 ──► E1-S5
 E1-S6 ──► E1-S7 ──► E1-S8
 ```
 
-### Epic 2: Cloud Backend + Consumer App
+### Epic 2: Local Backend + Consumer App
 
 **Story Sequence:**
 
 1. **E2-S1: FastAPI Scaffold** - Project setup, health endpoint
-2. **E2-S2: Firestore Integration** - Data models, CRUD operations
-3. **E2-S3: Bearer Token Auth** - Middleware, token verification
+2. **E2-S2: SQLite Integration** - SQLAlchemy models, CRUD operations
+3. **E2-S3: Basic Auth** - Admin API authentication middleware
 4. **E2-S4: Edge API Integration** - Update endpoint, delta processing
 5. **E2-S5: Vue PWA Scaffold** - Vite, Vue 3, Pinia, PWA config
 6. **E2-S6: Inventory Display** - Grid component, stock indicators
@@ -694,30 +760,27 @@ foodinsight-edge/
     └── foodinsight.service
 ```
 
-### Cloud Backend
+### Local Backend
 
 ```
-foodinsight-server/
+server/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py             # FastAPI entry
-│   ├── config.py           # Settings
-│   ├── dependencies.py     # DI
+│   ├── config.py           # Pydantic settings
+│   ├── database.py         # SQLAlchemy engine
 │   ├── routers/
+│   │   ├── health.py       # /health, /ready, /info
 │   │   ├── inventory.py    # /inventory/*
-│   │   └── health.py       # /health
-│   ├── models/
-│   │   ├── inventory.py    # Pydantic models
-│   │   └── events.py
-│   ├── services/
-│   │   └── firestore.py    # DB client
-│   └── auth/
-│       └── token.py        # Bearer validation
+│   │   └── admin.py        # /admin/* (Basic auth)
+│   ├── db/
+│   │   └── models.py       # SQLAlchemy ORM models
+│   └── services/
+│       └── sqlite.py       # SQLite service layer
 ├── tests/
 │   └── test_inventory.py
 ├── pyproject.toml
-├── Dockerfile
-└── cloudbuild.yaml
+└── README.md
 ```
 
 ### Consumer PWA
@@ -765,8 +828,8 @@ foodinsight-app/
 
 | Test | Description |
 |------|-------------|
-| Edge → Cloud | Verify delta updates reach Firestore |
-| Cloud → PWA | Verify inventory API returns correct data |
+| Edge → Backend | Verify delta updates reach SQLite |
+| Backend → PWA | Verify inventory API returns correct data |
 | End-to-End | Simulated item removal updates PWA |
 
 ### Manual Testing
@@ -871,22 +934,37 @@ sudo systemctl enable foodinsight
 sudo systemctl start foodinsight
 ```
 
-### Cloud Backend
+### Local Backend
 
 ```bash
-# Deploy to Cloud Run
-gcloud run deploy foodinsight-api \
-  --source . \
-  --region us-central1 \
-  --allow-unauthenticated
+# On the device (same as edge device or separate)
+cd server
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install with dev dependencies
+pip install -e ".[dev]"
+
+# Initialize database (auto-creates on first run)
+# Default credentials: admin/admin
+
+# Run backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Consumer PWA
 
 ```bash
-# Deploy to Cloudflare Pages
-cd foodinsight-app
+# Build for production
+cd app
 bun run build
+
+# Option 1: Serve from local device (simple)
+python -m http.server 3000 -d dist
+
+# Option 2: Deploy to Cloudflare Pages (for remote access)
 wrangler pages deploy dist --project-name=foodinsight
 ```
 
@@ -940,10 +1018,10 @@ wrangler pages deploy dist --project-name=foodinsight
 | **FR2.2** | Push delta updates to cloud | Edge Detection Service | ✅ Covered |
 | **FR2.3** | Include timestamp + confidence | Data Models | ✅ Covered |
 | **FR2.4** | Batch updates (max 1/second) | Edge Detection Service | ✅ Covered |
-| **FR3.1** | Receive/store inventory updates | Cloud Backend | ✅ Covered |
-| **FR3.2** | REST API for inventory retrieval | Cloud Backend | ✅ Covered |
-| **FR3.3** | Firestore with company isolation | Data Architecture | ✅ Covered |
-| **FR3.4** | Bearer token authentication | Cloud Backend | ✅ Covered |
+| **FR3.1** | Receive/store inventory updates | Local Backend | ✅ Covered |
+| **FR3.2** | REST API for inventory retrieval | Local Backend | ✅ Covered |
+| **FR3.3** | SQLite for local-first operation | Data Architecture | ✅ Covered |
+| **FR3.4** | Basic authentication for admin | Local Backend | ✅ Covered |
 | **FR4.1** | Display current snack inventory | Consumer PWA | ✅ Covered |
 | **FR4.2** | Show item name and count | Consumer PWA | ✅ Covered |
 | **FR4.3** | Indicate out of stock items | Consumer PWA | ✅ Covered |
@@ -964,13 +1042,13 @@ wrangler pages deploy dist --project-name=foodinsight
 | Requirement | Target | Architecture Solution | Status |
 |-------------|--------|----------------------|--------|
 | **NFR1** | Detection <500ms | NCNN + motion trigger = 170-250ms | ✅ Met |
-| **NFR2** | API response <200ms | FastAPI async + Firestore | ✅ Met |
-| **NFR3** | PWA load <2s | Vite + Cloudflare CDN | ✅ Met |
-| **NFR4** | 95% uptime | Cloud Run + systemd | ✅ Design supports |
+| **NFR2** | API response <200ms | FastAPI async + SQLite | ✅ Met |
+| **NFR3** | PWA load <2s | Vite + local serve (33KB gzipped) | ✅ Met |
+| **NFR4** | 95% uptime | systemd service | ✅ Design supports |
 | **NFR5** | Power <15W | RPi 5 ~8W during detection | ✅ Met |
-| **NFR6** | Cloud cost <$10/mo | Free tier (Cloud Run + Firestore + CF Pages) | ✅ Met |
-| **NFR7** | 30-day retention | Firestore TTL (Phase 2) | ⏳ Deferred |
-| **NFR8** | Offline mode | Edge buffering design | ✅ Design supports |
+| **NFR6** | Cloud cost $0/mo | Local SQLite, no cloud required | ✅ Met |
+| **NFR7** | 30-day retention | SQLite cleanup job (Phase 2) | ⏳ Deferred |
+| **NFR8** | Offline mode | Fully local-first design | ✅ Met |
 
 ### Goal Alignment
 
@@ -998,26 +1076,29 @@ All 23 functional requirements are mapped to components. All must-have NFRs have
 | 1.3 | 2026-01-10 | PAI | **IMPLEMENTED** - All components built and tested locally |
 | 1.4 | 2026-01-10 | PAI | Added `allowed_classes` feature for class filtering (FR1.6) |
 | 1.5 | 2026-01-10 | PAI | Added `camera_index` setting for dev camera selection |
+| 2.0 | 2026-01-11 | PAI | **LOCAL-FIRST MIGRATION** - Replaced Firestore with SQLite, updated all diagrams and ADRs |
 
 ---
 
 ## Implementation Notes
 
-### Completed Implementation (2026-01-10)
+### Completed Implementation (2026-01-11)
 
 **Edge Detection System:**
 - YOLO11n exported to NCNN format successfully
 - ByteTrack tracking with `fuse_score: true` configuration
-- Motion detection, ROI masking, inventory state management
+- Motion detection (threshold: 0.008), ROI masking, inventory state management
 - **Class filtering** - `allowed_classes` setting restricts detection to food-related COCO classes
 - Flask admin portal with MJPEG camera preview
 - Achieved ~45 FPS on Mac M4 Pro (development testing)
 
-**Cloud Backend:**
+**Local Backend (SQLite):**
 - FastAPI server with Pydantic v2 settings
-- Mock router for local development (no Firestore dependency)
-- Bearer token authentication ready
-- Health endpoint and inventory API
+- SQLAlchemy 2.0 ORM with SQLite database
+- Basic authentication for admin API endpoints
+- Full CRUD for inventory, events, config, users, alerts
+- Audit logging for admin actions
+- Health, ready, and info endpoints
 
 **Consumer PWA:**
 - Vue 3 + Vite + Pinia + Tailwind CSS v4
@@ -1031,10 +1112,12 @@ All 23 functional requirements are mapped to components. All must-have NFRs have
 2. Numpy types needed conversion for JSON serialization
 3. Pydantic v2 uses `model_config = SettingsConfigDict()` not `class Config`
 4. Tailwind CSS v4 requires `@tailwindcss/vite` plugin
+5. Vue store updated to match SQLite backend response format (array vs dictionary)
 
 **Development Features:**
 - `camera_index` setting to choose between cameras (0=iPhone, 1=built-in webcam on Mac)
 - Set via `CAMERA_INDEX` environment variable or in `dev_config.json`
+- Dev scripts: `scripts/start-dev.sh` and `scripts/stop-dev.sh` for easy local testing
 
 ---
 

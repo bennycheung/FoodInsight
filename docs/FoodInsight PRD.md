@@ -1,9 +1,9 @@
 # FoodInsight Product Requirements Document (PRD)
 
 **Author:** Benny
-**Date:** 2026-01-10
+**Date:** 2026-01-11
 **Project Level:** 2 (Focused Internal Tool)
-**Project Type:** Edge AI + Cloud Backend + PWA
+**Project Type:** Edge AI + Local Backend + PWA
 **Target Scale:** Single office break room prototype
 
 ---
@@ -54,11 +54,11 @@ FoodInsight solves this by providing real-time inventory visibility. This protot
 - **FR2.3** System shall include timestamp and confidence scores in updates
 - **FR2.4** System shall batch updates to avoid excessive API calls (max 1 update/second)
 
-#### FR3: Cloud Backend (FastAPI)
+#### FR3: Local Backend (FastAPI)
 - **FR3.1** Backend shall receive and store inventory updates from edge device
 - **FR3.2** Backend shall provide REST API for retrieving current inventory
-- **FR3.3** Backend shall store data in Firestore with company/machine isolation
-- **FR3.4** Backend shall authenticate edge device via Bearer token
+- **FR3.3** Backend shall store data in SQLite for local-first operation (no cloud dependency)
+- **FR3.4** Backend shall provide admin API with Basic authentication for configuration
 
 #### FR4: Consumer PWA (Client App)
 - **FR4.1** App shall display current snack inventory for the break room
@@ -89,9 +89,9 @@ FoodInsight solves this by providing real-time inventory visibility. This protot
 | **NFR3** | PWA load time | <2 seconds on 4G | Should Have |
 | **NFR4** | System uptime | 95% during office hours | Should Have |
 | **NFR5** | Edge device power | <15W continuous | Should Have |
-| **NFR6** | Cloud cost | <$10/month for prototype | Should Have |
+| **NFR6** | Infrastructure cost | $0/month (local SQLite, no cloud) | Must Have |
 | **NFR7** | Data retention | 30 days of inventory history | Could Have |
-| **NFR8** | Offline mode | Edge continues detecting if cloud unreachable | Should Have |
+| **NFR8** | Offline mode | System operates fully offline (local-first design) | Must Have |
 
 ---
 
@@ -187,15 +187,15 @@ FoodInsight solves this by providing real-time inventory visibility. This protot
 - YOLO11n exported to NCNN format, ByteTrack tracking working
 - Flask admin portal with live camera preview and ROI configuration
 
-### Epic 2: Cloud Backend + Consumer App
+### Epic 2: Local Backend + Consumer App
 
-**Goal:** Inventory data flows to cloud, employees view via PWA
+**Goal:** Inventory data stored locally, employees view via PWA
 
 **Stories:**
 1. **E2-S1:** Create FastAPI backend with /inventory endpoints
-2. **E2-S2:** Implement Firestore data model (machines, inventory, events)
-3. **E2-S3:** Add Bearer token authentication for edge devices
-4. **E2-S4:** Edge device pushes delta updates to cloud
+2. **E2-S2:** Implement SQLite data model (inventory, events, config, users)
+3. **E2-S3:** Add Basic authentication for admin API endpoints
+4. **E2-S4:** Edge device pushes delta updates to local backend
 5. **E2-S5:** Build Consumer PWA with Vue 3 + Vite
 6. **E2-S6:** Implement inventory grid display with stock indicators
 7. **E2-S7:** Add auto-refresh (polling every 30 seconds)
@@ -207,11 +207,11 @@ FoodInsight solves this by providing real-time inventory visibility. This protot
 - [x] PWA installable on mobile devices
 - [x] Inventory display matches edge device state
 
-**Implementation Status:** COMPLETE (2026-01-10)
-- FastAPI backend at `/Users/bcheung/dev/FoodInsight/server/`
+**Implementation Status:** COMPLETE (2026-01-11)
+- FastAPI backend with SQLite at `/Users/bcheung/dev/FoodInsight/server/`
 - Vue 3 PWA at `/Users/bcheung/dev/FoodInsight/app/`
-- Mock router for local development (no Firestore needed)
-- Full stack tested locally: backend on :8000, frontend on :5173
+- Local-first design: no cloud dependency required
+- Full stack tested locally: backend on :8000, frontend on :5173, admin on :8080
 
 ---
 
@@ -244,25 +244,26 @@ FoodInsight solves this by providing real-time inventory visibility. This protot
 
 | Dependency | Type | Risk |
 |------------|------|------|
-| Raspberry Pi 5 availability | Hardware | Low |
+| Raspberry Pi 4/5 availability | Hardware | Low |
 | Roboflow Universe snack datasets | Data | Low |
-| Firestore free tier limits | Cloud | Low |
-| Cloudflare Pages for PWA hosting | Infrastructure | Low |
+| Local network connectivity | Infrastructure | Low |
+| SQLite (bundled with Python) | Database | None |
 
 ---
 
 ## Technical Preferences (Captured)
 
 From architecture proposal:
-- **Edge Device:** Raspberry Pi 5 8GB ($80)
+- **Edge Device:** Raspberry Pi 5 8GB ($80) or RPi 4 ($55)
 - **Detection Model:** YOLO11n (NCNN format for CPU)
-- **Backend:** FastAPI (Python 3.11+)
-- **Database:** Firestore
+- **Backend:** FastAPI (Python 3.11+) with SQLite
+- **Database:** SQLite (local-first, no cloud dependency)
 - **Client App:** Vue 3 + Vite PWA
 - **Edge Admin:** Flask + HTMX
-- **Hosting:** GCP Cloud Run (backend), Cloudflare Pages (PWA)
+- **Hosting:** All local (PWA served from device or static hosting)
 - **Allowed Classes:** Configurable filter for detection (default: food-related COCO classes - bottle, cup, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, etc.)
 - **Camera Index:** Configurable camera selection for development (0=iPhone via Continuity Camera, 1=built-in webcam on Mac)
+- **Motion Threshold:** 0.008 (high sensitivity for item detection)
 
 ---
 
@@ -297,19 +298,20 @@ From architecture proposal:
 - [x] Epic structure defined (2 epics, 16 stories)
 - [x] Architecture phase complete
 - [x] **Epic 1 IMPLEMENTED** (2026-01-10)
-- [x] **Epic 2 IMPLEMENTED** (2026-01-10)
+- [x] **Epic 2 IMPLEMENTED** (2026-01-11, migrated to SQLite)
 
 ## Implementation Summary
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| Edge Detection | `/Users/bcheung/dev/FoodInsight/detection/` | Complete |
-| Admin Portal | `/Users/bcheung/dev/FoodInsight/admin/` | Complete |
-| Privacy Pipeline | `/Users/bcheung/dev/FoodInsight/privacy/` | Complete |
-| Cloud Backend | `/Users/bcheung/dev/FoodInsight/server/` | Complete |
-| Consumer PWA | `/Users/bcheung/dev/FoodInsight/app/` | Complete |
+| Edge Detection | `detection/` | Complete |
+| Admin Portal | `admin/` | Complete |
+| Privacy Pipeline | `privacy/` | Complete |
+| Local Backend (SQLite) | `server/` | Complete |
+| Consumer PWA | `app/` | Complete |
+| Dev Scripts | `scripts/` | Complete |
 
-**MVP Status:** Ready for deployment to cloud infrastructure
+**MVP Status:** Ready for local deployment (no cloud required)
 
 ---
 
