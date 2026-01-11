@@ -1,103 +1,152 @@
-"""Inventory API endpoints."""
+"""Inventory API endpoints.
+
+Local SQLite-based inventory management for single-device deployment.
+"""
 
 import time
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
-from app.auth.token import verify_token
-from app.models.inventory import InventoryResponse, InventoryUpdate
-from app.services.firestore import FirestoreClient, get_firestore_client
+from app.config import settings
+from app.services.sqlite import SQLiteService, get_sqlite_service
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 
-@router.post("/update")
-async def update_inventory(
-    data: InventoryUpdate,
-    auth: Annotated[dict, Depends(verify_token)],
-    db: Annotated[FirestoreClient, Depends(get_firestore_client)],
-):
-    """Update inventory from edge device.
+# ----- Request/Response Models -----
 
-    Requires Bearer token authentication.
-    Accepts delta updates with current counts and events.
+
+class InventoryItemUpdate(BaseModel):
+    """Single item update from detection pipeline."""
+
+    count: int
+    confidence: float = 1.0
+
+
+class InventoryUpdateRequest(BaseModel):
+    """Payload for inventory update from detection pipeline."""
+
+    items: dict[str, InventoryItemUpdate]
+    timestamp: datetime | None = None
+
+
+class InventoryEventCreate(BaseModel):
+    """Event to log with inventory update."""
+
+    event_type: str
+    item_name: str | None = None
+    count_before: int | None = None
+    count_after: int | None = None
+    confidence: float | None = None
+    details: dict | None = None
+
+
+# ----- Endpoints -----
+
+
+@router.post("/update")
+def update_inventory(
+    data: InventoryUpdateRequest,
+    service: Annotated[SQLiteService, Depends(get_sqlite_service)],
+):
+    """Update inventory from detection pipeline.
+
+    Called internally by the detection service after each frame analysis.
+    No authentication required for local device communication.
     """
     start_time = time.time()
 
-    company = auth["company"]
-    machine_id = auth["machine_id"]
-
-    # Validate machine_id matches token
-    if data.machine_id != machine_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Machine ID doesn't match authenticated device",
+    # Update each item
+    updated_items = []
+    for item_name, item_data in data.items.items():
+        result = service.update_inventory_item(
+            item_name=item_name,
+            count=item_data.count,
+            confidence=item_data.confidence,
         )
-
-    # Update inventory
-    await db.update_inventory(company, machine_id, data.items)
-
-    # Log events
-    event_ids = []
-    for event in data.events:
-        event_id = await db.log_event(company, machine_id, event.model_dump())
-        event_ids.append(event_id)
+        updated_items.append(result)
 
     processing_time = time.time() - start_time
 
     return {
         "status": "ok",
-        "machine_id": machine_id,
-        "items_updated": len(data.items),
-        "events_logged": len(event_ids),
+        "device_id": settings.device_id,
+        "items_updated": len(updated_items),
         "processing_time_ms": round(processing_time * 1000, 2),
     }
 
 
-@router.get("/{machine_id}", response_model=InventoryResponse)
-async def get_inventory(
-    machine_id: str,
-    company: Annotated[str, Query(description="Company identifier")],
-    db: Annotated[FirestoreClient, Depends(get_firestore_client)],
+@router.post("/event")
+def log_inventory_event(
+    event: InventoryEventCreate,
+    service: Annotated[SQLiteService, Depends(get_sqlite_service)],
 ):
-    """Get current inventory for a machine.
+    """Log a detection event.
 
-    Public endpoint - no authentication required.
+    Called by detection pipeline when inventory changes are detected.
     """
-    inventory = await db.get_inventory(company, machine_id)
-    if not inventory:
-        raise HTTPException(status_code=404, detail="Machine not found")
-
-    # Get machine info for location
-    machine = await db.get_machine(company, machine_id)
-
-    # Convert Firestore items to InventoryItem format
-    items = {}
-    for name, item_data in inventory.get("items", {}).items():
-        items[name] = {
-            "count": item_data.get("count", 0),
-            "confidence": item_data.get("confidence", 1.0),
-        }
-
-    return InventoryResponse(
-        machine_id=machine_id,
-        location=machine.get("location", "Unknown") if machine else "Unknown",
-        items=items,
-        last_updated=inventory.get("last_updated"),
+    result = service.log_event(
+        event_type=event.event_type,
+        item_name=event.item_name,
+        count_before=event.count_before,
+        count_after=event.count_after,
+        confidence=event.confidence,
+        details=event.details,
     )
+    return {"status": "ok", "event_id": result["id"]}
 
 
-@router.get("/{machine_id}/events")
-async def get_inventory_events(
-    machine_id: str,
-    company: Annotated[str, Query(description="Company identifier")],
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    db: Annotated[FirestoreClient, Depends(get_firestore_client)] = None,
+@router.get("")
+def get_inventory(
+    service: Annotated[SQLiteService, Depends(get_sqlite_service)],
 ):
-    """Get recent events for a machine.
+    """Get current inventory state.
+
+    Public endpoint for client app - no authentication required.
+    """
+    items = service.get_inventory()
+    location = service.get_config("device.location") or "Unknown"
+
+    return {
+        "device_id": settings.device_id,
+        "location": location,
+        "items": items,
+        "last_updated": max(
+            (item["last_updated"] for item in items if item.get("last_updated")),
+            default=None,
+        ),
+    }
+
+
+@router.get("/item/{item_name}")
+def get_inventory_item(
+    item_name: str,
+    service: Annotated[SQLiteService, Depends(get_sqlite_service)],
+):
+    """Get a single inventory item by name."""
+    item = service.get_inventory_item(item_name)
+    if not item:
+        return {"error": "Item not found", "item_name": item_name}
+    return item
+
+
+@router.get("/events")
+def get_inventory_events(
+    service: Annotated[SQLiteService, Depends(get_sqlite_service)],
+    event_type: Annotated[str | None, Query(description="Filter by event type")] = None,
+    item_name: Annotated[str | None, Query(description="Filter by item name")] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+):
+    """Get recent inventory events.
 
     Public endpoint - no authentication required.
     """
-    events = await db.get_events(company, machine_id, limit)
-    return {"events": events}
+    events = service.get_events(
+        event_type=event_type,
+        item_name=item_name,
+        limit=limit,
+    )
+    return {"events": events, "count": len(events)}

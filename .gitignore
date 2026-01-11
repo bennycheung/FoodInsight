@@ -31,6 +31,9 @@ runs/
 logs/
 *.log
 
+# Data (SQLite database, local storage)
+data/
+
 # Local dev config (contains local paths)
 dev_config.json
 

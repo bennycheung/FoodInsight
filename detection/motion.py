@@ -18,17 +18,19 @@ class MotionDetector:
 
     def __init__(
         self,
-        threshold: float = 0.02,
-        blur_size: int = 21,
-        cooldown_frames: int = 30,
+        threshold: float = 0.008,
+        blur_size: int = 11,
+        cooldown_frames: int = 45,
     ):
         """Initialize motion detector.
 
         Args:
             threshold: Minimum motion score (0-1) to trigger detection.
-                      0.02 = 2% of pixels changed
-            blur_size: Gaussian blur kernel size (must be odd)
-            cooldown_frames: Frames to continue detection after motion stops
+                      0.008 = 0.8% of pixels changed (sensitive for item detection)
+            blur_size: Gaussian blur kernel size (must be odd).
+                      11 = less smoothing, better small change detection
+            cooldown_frames: Frames to continue detection after motion stops.
+                            45 = ~1.5 seconds at 30fps to catch item settling
         """
         self.threshold = threshold
         self.blur_size = blur_size

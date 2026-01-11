@@ -4,13 +4,41 @@ Smart snack inventory monitoring system using YOLO11 object detection.
 
 ## Project Status: MVP COMPLETE
 
-All components implemented and tested locally (2026-01-10).
+All components implemented and tested locally (2026-01-11).
 
 | Component | Location | Status |
 |-----------|----------|--------|
 | Edge Detection | `detection/`, `admin/`, `privacy/` | Complete |
-| Cloud Backend | `server/` | Complete |
+| Local Backend | `server/` | Complete (SQLite) |
 | Consumer PWA | `app/` | Complete |
+
+## Architecture
+
+**Local-First Design**: All data stored locally on the device using SQLite. No cloud dependencies required.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FoodInsight Device                       │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
+│  │   Camera     │───▶│  Detection   │───▶│  Inventory   │  │
+│  │   Input      │    │  Pipeline    │    │  Tracker     │  │
+│  └──────────────┘    └──────────────┘    └──────┬───────┘  │
+│                                                  │          │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────▼───────┐  │
+│  │   Admin      │◀──▶│   FastAPI    │◀──▶│   SQLite     │  │
+│  │   Portal     │    │   Backend    │    │   Database   │  │
+│  │  (Flask)     │    │  (Port 8000) │    │              │  │
+│  └──────────────┘    └──────┬───────┘    └──────────────┘  │
+│        :80                  │              foodinsight.db  │
+└─────────────────────────────┼───────────────────────────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │   Consumer PWA    │
+                    │   (Vue 3 + Vite)  │
+                    │   Phone / Browser │
+                    └───────────────────┘
+```
 
 ## Quick Start (Local Development)
 
@@ -140,16 +168,17 @@ sudo mkdir -p /opt/foodinsight
 sudo cp -r . /opt/foodinsight/
 sudo chown -R pi:pi /opt/foodinsight
 
-# Create config file
+# Create config file (local SQLite - no cloud credentials needed)
 cat > /opt/foodinsight/config.json << EOF
 {
   "machine_id": "breakroom-001",
   "model_path": "/opt/foodinsight/models/yolo11n_ncnn_model",
-  "api_url": "https://your-api.run.app",
-  "api_key": "your-bearer-token"
+  "api_url": "http://localhost:8000"
 }
 EOF
 ```
+
+**Default Admin Credentials**: `admin` / `admin` (change after first login)
 
 ### Running
 
@@ -200,6 +229,43 @@ foodinsight-edge/
 
 ## Testing
 
+### Development Services
+
+Three services available for local development testing:
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| FastAPI Backend | 8000 | API server (SQLite) |
+| OpenAPI Docs | 8000 | `/docs` (Swagger) or `/redoc` |
+| Vue PWA | 5173 | Consumer inventory view |
+| Flask Admin | 8080 | Admin/detection portal |
+
+**Start all services:**
+```bash
+./scripts/start-dev.sh
+```
+
+**Stop all services:**
+```bash
+./scripts/stop-dev.sh
+```
+
+**Manual start (separate terminals):**
+```bash
+# Terminal 1: Backend API
+cd server && source .venv/bin/activate
+uvicorn app.main:app --port 8000
+
+# Terminal 2: Consumer PWA
+cd app && bun run dev
+
+# Terminal 3: Detection + Admin Portal
+source .venv/bin/activate
+CAMERA_INDEX=1 python run_dev.py
+```
+
+### Unit Tests
+
 Run the test suite:
 
 ```bash
@@ -216,13 +282,35 @@ python -m pytest tests/ --cov=detection --cov=privacy
 
 ## API Endpoints
 
+### Admin Portal (Flask - Port 80)
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/` | GET | Admin dashboard |
 | `/preview` | GET | MJPEG video stream |
-| `/status` | GET | JSON status |
+| `/status` | GET | JSON status (real-time) |
 | `/roi` | GET/POST | ROI configuration |
 | `/health` | GET | Health check |
+| `/api/inventory-data` | GET | Inventory from backend |
+| `/api/events` | GET | Recent detection events |
+| `/api/admin/*` | GET/POST | Admin operations (auth required) |
+
+### FastAPI Backend (Port 8000)
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/health` | GET | None | Health check |
+| `/ready` | GET | None | Readiness check (DB status) |
+| `/info` | GET | None | Device information |
+| `/inventory` | GET | None | Current inventory |
+| `/inventory/update` | POST | None | Push inventory update |
+| `/inventory/event` | POST | None | Log detection event |
+| `/inventory/events` | GET | None | Get recent events |
+| `/admin/status` | GET | Basic | Device status |
+| `/admin/config` | GET/PUT | Basic | Configuration |
+| `/admin/users` | GET/POST/DELETE | Basic | User management |
+| `/admin/alerts` | GET/POST | Basic | Alert rules |
+| `/admin/audit` | GET | Basic | Audit logs |
 
 ## Platform Detection
 
@@ -249,20 +337,28 @@ FoodInsight/
 │   ├── inventory.py     # State management
 │   └── service.py       # Main orchestrator
 ├── admin/               # Flask admin portal
-│   ├── app.py           # Flask application
+│   ├── app.py           # Flask application (proxies to backend)
 │   └── templates/       # HTML templates
 ├── privacy/             # Privacy pipeline
 │   └── pipeline.py      # ROI masking
-├── api/                 # Cloud API client
-│   └── client.py        # HTTP client
+├── api/                 # Local API client
+│   └── client.py        # HTTP client for local backend
 ├── config/              # Configuration
-├── server/              # Cloud backend (FastAPI)
+│   ├── settings.py      # Settings management
+│   └── platform.py      # Platform detection
+├── server/              # Local backend (FastAPI + SQLite)
 │   ├── app/
-│   │   ├── main.py
-│   │   ├── config.py
+│   │   ├── main.py      # FastAPI entry point
+│   │   ├── config.py    # Pydantic settings
+│   │   ├── database.py  # SQLAlchemy engine
+│   │   ├── db/
+│   │   │   └── models.py  # ORM models
 │   │   ├── routers/
-│   │   ├── models/
+│   │   │   ├── health.py    # Health endpoints
+│   │   │   ├── inventory.py # Inventory CRUD
+│   │   │   └── admin.py     # Admin API (auth required)
 │   │   └── services/
+│   │       └── sqlite.py    # SQLite service layer
 │   └── tests/
 ├── app/                 # Consumer PWA (Vue 3)
 │   ├── src/
@@ -286,10 +382,10 @@ FoodInsight/
 
 ## Next Steps
 
-1. **Deploy to Cloud** - Cloud Run (backend) + Cloudflare Pages (PWA)
-2. **Train Custom Model** - Fine-tune YOLO11n on office snack dataset
-3. **Add Firestore** - Replace mock router with real Firestore
-4. **Field Testing** - Deploy to actual break room
+1. **Train Custom Model** - Fine-tune YOLO11n on office snack dataset
+2. **Field Testing** - Deploy to actual break room
+3. **Multi-Device Sync** - Optional cloud sync for multiple devices
+4. **Mobile App** - Native app for notifications
 
 ## License
 

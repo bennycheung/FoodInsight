@@ -1,4 +1,8 @@
-"""Flask admin portal for FoodInsight edge device."""
+"""Flask admin portal for FoodInsight edge device.
+
+Provides local dashboard with live video feed and status display.
+Proxies configuration and admin operations to the local FastAPI backend.
+"""
 
 import json
 import logging
@@ -8,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import cv2
+import httpx
 from flask import Flask, Response, jsonify, render_template, request
 
 logger = logging.getLogger(__name__)
@@ -25,8 +30,16 @@ _status_data: Dict[str, Any] = {
     "motion_active": False,
 }
 
-# Configuration
-CONFIG_PATH = Path("/opt/foodinsight/config.json")
+# Configuration - use local path for development, /opt for production
+_project_root = Path(__file__).parent.parent
+if (_project_root / "run_dev.py").exists():
+    # Development mode - use local config
+    CONFIG_PATH = _project_root / "dev_config.json"
+else:
+    # Production mode - use system path
+    CONFIG_PATH = Path("/opt/foodinsight/config.json")
+
+API_BASE_URL = "http://localhost:8000"  # Local FastAPI backend
 
 
 def create_app() -> Flask:
@@ -137,6 +150,168 @@ def register_routes(app: Flask) -> None:
         """Health check endpoint."""
         return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
 
+    # ----- Backend API Proxy Routes -----
+
+    @app.route("/api/device-info")
+    def device_info():
+        """Get device info from backend (HTMX partial)."""
+        result = api_get("/info")
+        if result:
+            # Return HTML partial for HTMX
+            html = '<dl class="device-info">'
+            html += f'<dt>Device ID</dt><dd>{result.get("device_id", "N/A")}</dd>'
+            html += f'<dt>Device Name</dt><dd>{result.get("device_name", "N/A")}</dd>'
+            html += f'<dt>Location</dt><dd>{result.get("location", "N/A")}</dd>'
+            html += f'<dt>Version</dt><dd>{result.get("version", "N/A")}</dd>'
+            html += f'<dt>Environment</dt><dd>{result.get("environment", "N/A")}</dd>'
+            html += '</dl>'
+            return html
+        return '<p class="error">Backend unavailable</p>'
+
+    @app.route("/api/backend-status")
+    def backend_status():
+        """Get backend health status (HTMX partial)."""
+        result = api_get("/ready")
+        if result and result.get("status") == "ready":
+            return '<div class="status-indicator backend"></div><span>Backend: online</span>'
+        return '<div class="status-indicator offline"></div><span>Backend: offline</span>'
+
+    @app.route("/api/inventory-data")
+    def inventory_data():
+        """Get inventory from backend (HTMX partial)."""
+        result = api_get("/inventory")
+        if result:
+            items = result.get("items", [])
+            if not items:
+                return '<p>No items in database</p>'
+            html = '<div class="inventory">'
+            for item in items:
+                count = item.get("count", 0)
+                name = item.get("display_name", item.get("item_name", "Unknown"))
+                status_class = "in-stock" if count > 0 else "out-of-stock"
+                html += f'<div class="item {status_class}">'
+                html += f'<span class="count">{count}</span>'
+                html += f'<span class="name">{name}</span>'
+                html += '</div>'
+            html += '</div>'
+            last_updated = result.get("last_updated", "Never")
+            html += f'<p style="font-size: 0.8rem; opacity: 0.6; margin-top: 10px;">Last updated: {last_updated}</p>'
+            return html
+        # Fall back to in-memory status
+        inventory = _status_data.get("inventory", {})
+        if not inventory:
+            return '<p>No items detected</p>'
+        html = '<div class="inventory">'
+        for item, count in inventory.items():
+            status_class = "in-stock" if count > 0 else "out-of-stock"
+            html += f'<div class="item {status_class}">'
+            html += f'<span class="count">{count}</span>'
+            html += f'<span class="name">{item}</span>'
+            html += '</div>'
+        html += '</div>'
+        return html
+
+    @app.route("/api/events")
+    def get_events():
+        """Get recent events from backend (HTMX partial)."""
+        limit = request.args.get("limit", 50, type=int)
+        item_name = request.args.get("item_name")
+        event_type = request.args.get("event_type")
+
+        params = f"?limit={limit}"
+        if item_name:
+            params += f"&item_name={item_name}"
+        if event_type:
+            params += f"&event_type={event_type}"
+
+        result = api_get(f"/inventory/events{params}")
+        if result:
+            events = result.get("events", [])
+            if not events:
+                return '<p>No recent events</p>'
+            html = ''
+            for event in events:
+                event_type = event.get("event_type", "unknown")
+                item_name = event.get("item_name", "Unknown")
+                count_before = event.get("count_before", 0)
+                count_after = event.get("count_after", 0)
+                created_at = event.get("created_at", "")
+
+                # Format event type for display
+                event_class = "added" if event_type == "item_added" else "taken" if event_type == "item_removed" else ""
+                action = "added" if event_type == "item_added" else "removed" if event_type == "item_removed" else event_type
+
+                html += f'<div class="event-item {event_class}">'
+                html += f'<strong>{item_name}</strong> {action} ({count_before} → {count_after})'
+                html += f'<div class="event-time">{created_at}</div>'
+                html += '</div>'
+            return html
+        return '<p>Unable to load events</p>'
+
+    @app.route("/api/admin/status")
+    def admin_status():
+        """Get admin status (requires auth header forwarding)."""
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Basic "):
+            import base64
+            try:
+                decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                username, password = decoded.split(":", 1)
+                result = api_get("/admin/status", auth=(username, password))
+                if result:
+                    return jsonify(result)
+            except Exception:
+                pass
+        return jsonify({"error": "Unauthorized"}), 401
+
+    @app.route("/api/admin/config")
+    def admin_config():
+        """Get admin config (requires auth header forwarding)."""
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Basic "):
+            import base64
+            try:
+                decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                username, password = decoded.split(":", 1)
+                result = api_get("/admin/config", auth=(username, password))
+                if result:
+                    return jsonify(result)
+            except Exception:
+                pass
+        return jsonify({"error": "Unauthorized"}), 401
+
+    @app.route("/api/admin/detection/start", methods=["POST"])
+    def start_detection():
+        """Start detection via backend."""
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Basic "):
+            import base64
+            try:
+                decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                username, password = decoded.split(":", 1)
+                result = api_post("/admin/detection/start", auth=(username, password))
+                if result:
+                    return jsonify(result)
+            except Exception:
+                pass
+        return jsonify({"error": "Unauthorized"}), 401
+
+    @app.route("/api/admin/detection/stop", methods=["POST"])
+    def stop_detection():
+        """Stop detection via backend."""
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Basic "):
+            import base64
+            try:
+                decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                username, password = decoded.split(":", 1)
+                result = api_post("/admin/detection/stop", auth=(username, password))
+                if result:
+                    return jsonify(result)
+            except Exception:
+                pass
+        return jsonify({"error": "Unauthorized"}), 401
+
 
 def generate_frames():
     """Generate MJPEG frames for video stream."""
@@ -177,7 +352,20 @@ def update_status(status: Any) -> None:
 
 
 def load_config() -> Dict[str, Any]:
-    """Load configuration from file."""
+    """Load configuration from file (legacy) or backend API."""
+    # Try backend first
+    try:
+        with httpx.Client(timeout=2.0) as client:
+            response = client.get(f"{API_BASE_URL}/admin/config")
+            if response.status_code == 401:
+                # Need auth - fall back to file
+                pass
+            elif response.is_success:
+                return response.json()
+    except Exception as e:
+        logger.debug(f"Backend config fetch failed: {e}")
+
+    # Fall back to local file
     if CONFIG_PATH.exists():
         with open(CONFIG_PATH, "r") as f:
             return json.load(f)
@@ -196,3 +384,51 @@ def notify_config_reload() -> None:
     # Signal file for config reload
     signal_file = CONFIG_PATH.parent / ".reload"
     signal_file.touch()
+
+
+# ----- Backend API Helpers -----
+
+
+def api_get(path: str, auth: tuple = None) -> Optional[Dict]:
+    """Make GET request to backend API."""
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            kwargs = {}
+            if auth:
+                kwargs["auth"] = auth
+            response = client.get(f"{API_BASE_URL}{path}", **kwargs)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.warning(f"API GET {path} failed: {e}")
+        return None
+
+
+def api_post(path: str, data: dict = None, auth: tuple = None) -> Optional[Dict]:
+    """Make POST request to backend API."""
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            kwargs = {"json": data} if data else {}
+            if auth:
+                kwargs["auth"] = auth
+            response = client.post(f"{API_BASE_URL}{path}", **kwargs)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.warning(f"API POST {path} failed: {e}")
+        return None
+
+
+def api_put(path: str, data: dict, auth: tuple = None) -> Optional[Dict]:
+    """Make PUT request to backend API."""
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            kwargs = {"json": data}
+            if auth:
+                kwargs["auth"] = auth
+            response = client.put(f"{API_BASE_URL}{path}", **kwargs)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.warning(f"API PUT {path} failed: {e}")
+        return None

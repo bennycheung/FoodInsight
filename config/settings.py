@@ -68,9 +68,9 @@ class Settings:
     blur_intensity: int = 51
     roi: Optional[ROI] = None
 
-    # Cloud API settings
-    api_url: str = "https://foodinsight-api.run.app"
-    api_key: str = ""
+    # Local API settings (FastAPI backend on same device)
+    api_url: str = "http://localhost:8000"
+    api_port: int = 8000  # Port for local FastAPI server
 
     # Admin portal settings
     admin_port: int = 80

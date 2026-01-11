@@ -1,5 +1,7 @@
 """Application configuration using Pydantic settings."""
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,13 +13,30 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
     )
 
-    google_cloud_project: str = ""
+    # Environment
+    environment: str = "development"
+
+    # Database (SQLite)
+    database_path: str = str(Path(__file__).parent.parent / "data" / "foodinsight.db")
+    database_echo: bool = False  # Log SQL queries (set True for debugging)
+
+    # CORS
     allowed_origins: list[str] = [
         "http://localhost:5173",
         "http://localhost:8080",
-        "https://foodinsight.pages.dev",
+        "http://localhost:8000",
     ]
-    environment: str = "development"
+
+    # Security
+    secret_key: str = "change-me-in-production"  # For session/token signing
+    access_token_expire_minutes: int = 30
+
+    # Device identification
+    device_id: str = "foodinsight-001"
+    device_name: str = "FoodInsight Device"
+
+    # Legacy (can be removed once Firestore migration complete)
+    google_cloud_project: str = ""
 
 
 settings = Settings()

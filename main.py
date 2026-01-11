@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from admin import create_app, update_frame, update_status
-from api import CloudAPIClient
+from api import LocalAPIClient
 from config import get_settings
 from detection import DetectionService
 
@@ -38,7 +38,7 @@ class FoodInsightEdge:
     def __init__(self):
         self.settings = get_settings()
         self.detection_service: DetectionService = None
-        self.api_client: CloudAPIClient = None
+        self.api_client: LocalAPIClient = None
         self.flask_app = None
         self._shutdown_event = asyncio.Event()
 
@@ -49,10 +49,9 @@ class FoodInsightEdge:
         logger.info(f"Platform config: input_size={self.settings.input_size}, "
                    f"skip_frames={self.settings.process_every_n_frames}")
 
-        # Initialize API client
-        self.api_client = CloudAPIClient(
+        # Initialize local API client (connects to FastAPI backend on same device)
+        self.api_client = LocalAPIClient(
             base_url=self.settings.api_url,
-            api_key=self.settings.api_key,
         )
 
         # Initialize detection service with callbacks

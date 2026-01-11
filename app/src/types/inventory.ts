@@ -9,9 +9,19 @@ export interface InventoryItem {
   inStock: boolean
 }
 
+/**
+ * API response from /inventory endpoint.
+ * SQLite backend returns items as an array.
+ */
 export interface InventoryResponse {
-  machine_id: string
+  device_id: string
   location: string
-  items: Record<string, { count: number; confidence: number }>
+  items: Array<{
+    item_name: string
+    display_name: string
+    count: number
+    confidence: number
+    last_updated: string | null
+  }>
   last_updated: string | null
 }

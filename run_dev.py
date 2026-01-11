@@ -52,7 +52,7 @@ def main():
     patch_config_paths()
 
     from admin import create_app, update_frame, update_status
-    from api import CloudAPIClient
+    from api import LocalAPIClient
     from config import Settings
     from detection import DetectionService
 
@@ -66,10 +66,9 @@ def main():
         model_path=str(PROJECT_ROOT / "models" / "yolo11n_ncnn_model"),
         input_size=640,
         process_every_n_frames=1,
-        motion_threshold=0.02,
+        motion_threshold=0.008,  # High sensitivity for item detection
         admin_port=8080,  # Use non-privileged port
-        api_url="http://localhost:8000",  # Local backend for testing
-        api_key="dev-token",  # Dummy token for dev (mock backend doesn't validate)
+        api_url="http://localhost:8000",  # Local backend
         camera_index=camera_index,  # 0=iPhone, 1=built-in webcam (typically)
         # Filter to only report these classes (empty list = all classes)
         # Default food-related COCO classes for snack detection
@@ -124,9 +123,8 @@ def main():
     flask_app = create_app()
 
     # Create API client for pushing to backend
-    api_client = CloudAPIClient(
+    api_client = LocalAPIClient(
         base_url=settings.api_url,
-        api_key=settings.api_key,
     )
 
     async def push_delta(delta):

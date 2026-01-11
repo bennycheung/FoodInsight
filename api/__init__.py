@@ -1,5 +1,5 @@
 """FoodInsight API Client Module."""
 
-from .client import CloudAPIClient
+from .client import LocalAPIClient, CloudAPIClient
 
-__all__ = ["CloudAPIClient"]
+__all__ = ["LocalAPIClient", "CloudAPIClient"]
