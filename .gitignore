@@ -36,6 +36,7 @@ data/
 
 # Local dev config (contains local paths)
 dev_config.json
+.reload
 
 # Environment variables
 .env
