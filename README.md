@@ -1,6 +1,10 @@
 # FoodInsight
 
-Smart snack inventory monitoring system using YOLO11 object detection.
+Smart food inventory monitoring system using YOLO11 object detection on edge devices.
+
+![FoodInsight Hero](images/FoodInsight_Hero.png)
+
+*Edge AI food detection: A Raspberry Pi camera monitors a dining table, detecting Japanese dishes in real-time with YOLO11. Each dish receives a bounding box and confidence score, all processed locally.*
 
 ## Project Status: MVP COMPLETE
 
@@ -16,29 +20,9 @@ All components implemented and tested locally (2026-01-11).
 
 **Local-First Design**: All data stored locally on the device using SQLite. No cloud dependencies required.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    FoodInsight Device                       │
-├─────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │   Camera     │───▶│  Detection   │───▶│  Inventory   │  │
-│  │   Input      │    │  Pipeline    │    │  Tracker     │  │
-│  └──────────────┘    └──────────────┘    └──────┬───────┘  │
-│                                                  │          │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────▼───────┐  │
-│  │   Admin      │◀──▶│   FastAPI    │◀──▶│   SQLite     │  │
-│  │   Portal     │    │   Backend    │    │   Database   │  │
-│  │  (Flask)     │    │  (Port 8000) │    │              │  │
-│  └──────────────┘    └──────┬───────┘    └──────────────┘  │
-│        :80                  │              foodinsight.db  │
-└─────────────────────────────┼───────────────────────────────┘
-                              │
-                    ┌─────────▼─────────┐
-                    │   Consumer PWA    │
-                    │   (Vue 3 + Vite)  │
-                    │   Phone / Browser │
-                    └───────────────────┘
-```
+![FoodInsight Architecture](images/FoodInsight_Architecture_Diagram.png)
+
+*Local-first architecture: Camera frames flow through motion detection and YOLO11n inference on the edge device. Only inventory deltas (counts, not images) push to the local SQLite backend. The PWA polls for updates.*
 
 ## Quick Start (Local Development)
 
@@ -67,8 +51,20 @@ bun run dev
 - **Object Tracking**: ByteTrack for persistent item IDs across frames
 - **Motion-Triggered**: Only runs inference when activity detected
 - **Inventory Management**: Tracks item additions and removals
-- **Privacy-First**: ROI masking, only metadata sent to cloud
+- **Privacy-First**: ROI masking, only metadata sent to backend
 - **Admin Portal**: Local web interface for configuration
+
+### Detection Pipeline
+
+![Detection Pipeline](images/FoodInsight_Detection_Pipeline.png)
+
+*Camera frames at 30 FPS flow through motion detection, which gates expensive YOLO11n inference. Only frames with detected motion proceed to object detection, then ByteTrack for persistence, and finally inventory state management.*
+
+### How It Works
+
+![Detection Transform](images/FoodInsight_Detection_Transform.jpg)
+
+*From unknown to detected: Raw food images pass through YOLO11 to produce labeled detections with confidence scores.*
 
 ## Supported Platforms
 
@@ -337,6 +333,12 @@ Three services available for local development testing:
 | OpenAPI Docs | 8000 | `/docs` (Swagger) or `/redoc` |
 | Vue PWA | 5173 | Consumer inventory view |
 | Flask Admin | 8080 | Admin/detection portal |
+
+### Consumer PWA
+
+![PWA Screenshot](images/FoodInsight_PWA_Screenshot.png)
+
+*The FoodInsight PWA displays current meal status as a grid of cards. Green indicates available dishes with counts. Gray indicates finished items.*
 
 **Start all services:**
 ```bash
