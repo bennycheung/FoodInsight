@@ -53,60 +53,62 @@ def train(
     """
     from ultralytics import YOLO
 
-    # Load model
+    # Load model and train
     if resume:
+        # Resume from checkpoint - uses saved args.yaml automatically
         print(f"Resuming from: {resume}")
         model_obj = YOLO(resume)
+        results = model_obj.train(resume=True)
     else:
+        # Fresh training with specified parameters
         print(f"Loading base model: {model}")
         model_obj = YOLO(model)
 
-    # Train
-    print(f"\nStarting training...")
-    print(f"  Dataset: {data}")
-    print(f"  Epochs: {epochs}")
-    print(f"  Image size: {imgsz}")
-    print(f"  Batch size: {batch}")
-    print(f"  Device: {device}")
-    print()
+        print(f"\nStarting training...")
+        print(f"  Dataset: {data}")
+        print(f"  Epochs: {epochs}")
+        print(f"  Image size: {imgsz}")
+        print(f"  Batch size: {batch}")
+        print(f"  Device: {device}")
+        print()
 
-    results = model_obj.train(
-        data=data,
-        epochs=epochs,
-        imgsz=imgsz,
-        batch=batch,
-        device=device,
-        patience=patience,
-        workers=workers,
-        project=project,
-        name=name,
-        pretrained=pretrained,
-        # Data augmentation (good defaults for food)
-        augment=True,
-        hsv_h=0.015,  # Hue augmentation
-        hsv_s=0.7,    # Saturation augmentation
-        hsv_v=0.4,    # Value augmentation
-        degrees=10,   # Rotation
-        translate=0.1,
-        scale=0.5,
-        fliplr=0.5,   # Horizontal flip
-        flipud=0.0,   # No vertical flip (food orientation matters)
-        mosaic=1.0,   # Mosaic augmentation
-        mixup=0.1,    # Mixup augmentation
-        # Training parameters
-        lr0=0.01,     # Initial learning rate
-        lrf=0.01,     # Final learning rate factor
-        momentum=0.937,
-        weight_decay=0.0005,
-        warmup_epochs=3,
-        warmup_momentum=0.8,
-        warmup_bias_lr=0.1,
-        # Saving
-        save=True,
-        save_period=-1,  # Save every epoch if > 0
-        val=True,
-        plots=True,
-    )
+        results = model_obj.train(
+            data=data,
+            epochs=epochs,
+            imgsz=imgsz,
+            batch=batch,
+            device=device,
+            patience=patience,
+            workers=workers,
+            project=project,
+            name=name,
+            pretrained=pretrained,
+            # Data augmentation (good defaults for food)
+            augment=True,
+            hsv_h=0.015,  # Hue augmentation
+            hsv_s=0.7,    # Saturation augmentation
+            hsv_v=0.4,    # Value augmentation
+            degrees=10,   # Rotation
+            translate=0.1,
+            scale=0.5,
+            fliplr=0.5,   # Horizontal flip
+            flipud=0.0,   # No vertical flip (food orientation matters)
+            mosaic=1.0,   # Mosaic augmentation
+            mixup=0.1,    # Mixup augmentation
+            # Training parameters
+            lr0=0.01,     # Initial learning rate
+            lrf=0.01,     # Final learning rate factor
+            momentum=0.937,
+            weight_decay=0.0005,
+            warmup_epochs=3,
+            warmup_momentum=0.8,
+            warmup_bias_lr=0.1,
+            # Saving
+            save=True,
+            save_period=-1,  # Save every epoch if > 0
+            val=True,
+            plots=True,
+        )
 
     print(f"\nTraining complete!")
     print(f"Best weights: {project}/{name}/weights/best.pt")
