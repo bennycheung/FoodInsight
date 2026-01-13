@@ -1,10 +1,18 @@
 <template>
   <article
-    class="card-enter rounded-2xl p-4 min-h-[160px] shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5 flex flex-col items-center text-center"
-    :class="[cardGradientClass, { 'low-stock-pulse': stockLevel === 'low' }]"
+    role="listitem"
+    class="card-enter rounded-2xl p-4 min-h-[160px] shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5 flex flex-col items-center text-center relative"
+    :class="[
+      cardGradientClass,
+      { 'low-stock-pulse': stockLevel === 'low' && !isRestocked },
+      { 'card-celebrate': isRestocked && celebrateAnimating }
+    ]"
     :style="{ '--stagger-index': staggerIndex }"
     :aria-label="`${displayName}: ${ariaLabel}`"
+    @animationend="onCelebrateEnd"
   >
+    <!-- Sparkle effect for restocked items -->
+    <div v-if="isRestocked && celebrateAnimating" class="sparkle-effect" aria-hidden="true"></div>
     <!-- Large Centered Emoji -->
     <span class="text-5xl mb-2" aria-hidden="true">{{ emoji }}</span>
 
@@ -46,8 +54,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import type { InventoryItem } from '@/types/inventory'
+import { useInventoryStore } from '@/stores/inventory'
 import StatusBadge, { type StatusType } from './StatusBadge.vue'
 
 const props = defineProps<{
@@ -55,9 +64,38 @@ const props = defineProps<{
   staggerIndex?: number
 }>()
 
+const store = useInventoryStore()
+
 // Count change animation state
 const countAnimating = ref(false)
 const previousCount = ref(props.item.count)
+
+// Celebration animation state
+const celebrateAnimating = ref(false)
+
+// Check if this item is in the justRestocked set
+const isRestocked = computed(() => store.justRestocked.has(props.item.name))
+
+// Start celebration animation when item is restocked
+onMounted(() => {
+  if (isRestocked.value) {
+    celebrateAnimating.value = true
+  }
+})
+
+// Watch for restocked state changes
+watch(isRestocked, (newVal) => {
+  if (newVal) {
+    celebrateAnimating.value = true
+  }
+})
+
+// Handle celebration animation end
+function onCelebrateEnd(event: AnimationEvent) {
+  if (event.animationName === 'celebrate') {
+    celebrateAnimating.value = false
+  }
+}
 
 // Watch for count changes to trigger animation
 watch(
@@ -77,8 +115,12 @@ const stockLevel = computed(() => {
   return 'high'
 })
 
-// Map stock level to status type
+// Map stock level to status type (prioritize restocked status)
 const statusType = computed<StatusType>(() => {
+  // Show "Back in stock!" badge for restocked items
+  if (isRestocked.value) {
+    return 'restocked'
+  }
   switch (stockLevel.value) {
     case 'high':
       return 'available'
@@ -107,6 +149,10 @@ const cardGradientClass = computed(() => {
 
 // ARIA label for accessibility
 const ariaLabel = computed(() => {
+  // Prioritize restocked announcement
+  if (isRestocked.value) {
+    return `Back in stock! ${props.item.count} available`
+  }
   switch (stockLevel.value) {
     case 'high':
       return `${props.item.count} items available`

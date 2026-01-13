@@ -101,26 +101,199 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #faf5ff;
+  transition: background-color 200ms ease-in-out, color 200ms ease-in-out;
 }
 
-/* Dark Mode Support */
+/* ============================================
+   Epic 5 - E5-S1: Dark Mode Support
+   ============================================ */
+
+/* Smooth transitions for theme change */
+.card-enter,
+.shadow-card,
+article,
+div {
+  transition: background-color 200ms ease-in-out,
+              box-shadow 200ms ease-in-out,
+              color 200ms ease-in-out;
+}
+
+/* Dark Mode Color Scheme */
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg: var(--color-bg-dark);
     --color-card: var(--color-card-dark);
   }
 
+  body {
+    background-color: #1a1625;
+    color: #f9fafb;
+  }
+
+  /* Card gradients for dark mode */
   .bg-card-available {
-    background: linear-gradient(145deg, #2d2640 0%, #1f2d1f 100%);
+    background: linear-gradient(145deg, #2d2640 0%, #243328 100%);
   }
 
   .bg-card-warning {
-    background: linear-gradient(145deg, #2d2640 0%, #2d2520 100%);
+    background: linear-gradient(145deg, #2d2640 0%, #332820 100%);
   }
 
   .bg-card-empty {
-    background: linear-gradient(145deg, #1f1f1f 0%, #2a2a2a 100%);
+    background: linear-gradient(145deg, #252530 0%, #1f1f28 100%);
   }
+
+  /* Dark mode shadows with deeper tones */
+  .shadow-card {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3),
+                0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  }
+
+  .shadow-card-hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4),
+                0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Text colors for dark mode */
+  .text-gray-900 {
+    color: #f9fafb !important;
+  }
+
+  .text-gray-500 {
+    color: #9ca3af !important;
+  }
+
+  /* Going fast indicator in dark mode */
+  .going-fast {
+    color: #fb923c;
+  }
+}
+
+/* ============================================
+   Epic 5 - E5-S3: Accessibility Improvements
+   ============================================ */
+
+/* Visible focus ring with brand color */
+:focus-visible {
+  outline: 2px solid var(--color-snack-purple);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Remove default focus for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Ensure interactive elements have minimum touch target */
+button,
+[role="button"],
+.interactive-element {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-snack-purple);
+  color: white;
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ============================================
+   Epic 5 - E5-S2: Back-in-Stock Celebration
+   ============================================ */
+
+/* Celebration animation for restocked items */
+@keyframes celebrate {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1),
+                0 2px 4px -2px rgba(139, 92, 246, 0.1),
+                0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1),
+                0 2px 4px -2px rgba(139, 92, 246, 0.1),
+                0 0 20px 10px rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1),
+                0 2px 4px -2px rgba(139, 92, 246, 0.1),
+                0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.card-celebrate {
+  animation: celebrate 800ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Sparkle burst effect */
+@keyframes sparkle {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) rotate(180deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) rotate(360deg);
+  }
+}
+
+.sparkle-effect {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.sparkle-effect::before,
+.sparkle-effect::after {
+  content: '✨';
+  position: absolute;
+  animation: sparkle 800ms ease-out forwards;
+}
+
+.sparkle-effect::before {
+  top: 0;
+  left: 0;
+}
+
+.sparkle-effect::after {
+  top: 8px;
+  left: 8px;
+  animation-delay: 100ms;
 }
 
 /* ============================================
@@ -334,5 +507,18 @@ html {
     box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1),
                 0 2px 4px -2px rgba(139, 92, 246, 0.1),
                 0 0 0 4px rgba(249, 115, 22, 0.3);
+  }
+
+  /* No celebration animation - badge still shows */
+  .card-celebrate {
+    animation: none;
+    transform: none;
+  }
+
+  /* Hide sparkle effect */
+  .sparkle-effect,
+  .sparkle-effect::before,
+  .sparkle-effect::after {
+    display: none;
   }
 }

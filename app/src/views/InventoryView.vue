@@ -60,13 +60,15 @@
     </div>
 
     <!-- Inventory Grid -->
-    <div v-else>
+    <section v-else aria-labelledby="available-snacks-heading">
+      <h3 id="available-snacks-heading" class="sr-only">Available Snacks</h3>
+
       <!-- Error banner for refresh failures -->
-      <div v-if="store.error" class="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+      <div v-if="store.error" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm" role="alert">
         Update failed. Will retry automatically.
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5" role="list">
         <SnackCard
           v-for="(item, index) in sortedItems"
           :key="item.name"
@@ -75,10 +77,10 @@
         />
       </div>
 
-      <p v-if="store.items.length === 0" class="text-center py-8 text-gray-500">
+      <p v-if="store.items.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
         No snacks configured for this location.
       </p>
-    </div>
+    </section>
   </div>
 </template>
 
