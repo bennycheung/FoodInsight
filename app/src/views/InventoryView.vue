@@ -1,33 +1,51 @@
 <template>
   <div>
+    <!-- Pull-to-Refresh Indicator (mobile only) -->
+    <div
+      v-if="isTouchDevice && pullDistance > 0"
+      class="pull-indicator"
+      :style="{ transform: `translateX(-50%) translateY(${Math.min(pullDistance - 20, 60)}px)` }"
+    >
+      <div
+        class="pull-indicator-icon"
+        :class="{ 'refresh-spinning': pullIsRefreshing }"
+        :style="{ transform: `rotate(${pullProgress() * 360}deg)` }"
+      >
+        <svg
+          class="w-5 h-5"
+          :class="isThresholdMet() ? 'text-snack-purple' : 'text-gray-400'"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+      </div>
+    </div>
+
     <!-- Header with refresh status -->
     <div class="flex items-center justify-between mb-4">
-      <div class="text-sm text-gray-500">
+      <div class="text-sm text-gray-500 dark:text-gray-400">
         <LastUpdated :timestamp="store.lastUpdated" />
       </div>
 
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-gray-400">
-          {{ isRefreshing ? 'Refreshing...' : `Refreshing in ${secondsUntilRefresh}s` }}
-        </span>
-        <button
-          @click="refresh"
-          :disabled="isRefreshing"
-          class="p-2 rounded-full hover:bg-gray-100 transition-colors"
-          :class="{ 'animate-spin': isRefreshing }"
-          title="Refresh now"
-        >
-          <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-      </div>
+      <RefreshIndicator
+        :seconds="secondsUntilRefresh"
+        :total-seconds="30"
+        :is-refreshing="isRefreshing"
+        :error="!!store.error"
+        @refresh="refresh"
+      />
     </div>
 
     <!-- Loading State (only for initial load) -->
     <div v-if="store.loading && store.items.length === 0" class="grid grid-cols-2 md:grid-cols-3 gap-4">
-      <SkeletonCard v-for="i in 6" :key="i" />
+      <SkeletonCard v-for="i in 6" :key="i" :stagger-index="i - 1" />
     </div>
 
     <!-- Error State -->
@@ -50,9 +68,10 @@
 
       <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
         <SnackCard
-          v-for="item in sortedItems"
+          v-for="(item, index) in sortedItems"
           :key="item.name"
           :item="item"
+          :stagger-index="index"
         />
       </div>
 
@@ -67,9 +86,11 @@
 import { computed, onMounted } from 'vue'
 import { useInventoryStore } from '@/stores/inventory'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import SnackCard from '@/components/SnackCard.vue'
 import SkeletonCard from '@/components/SkeletonCard.vue'
 import LastUpdated from '@/components/LastUpdated.vue'
+import RefreshIndicator from '@/components/RefreshIndicator.vue'
 
 const store = useInventoryStore()
 
@@ -77,6 +98,15 @@ const { secondsUntilRefresh, isRefreshing, refresh } = useAutoRefresh(
   () => store.fetchInventory(true), // Silent refresh
   30000 // 30 seconds
 )
+
+// Pull-to-refresh for mobile
+const {
+  pullDistance,
+  isTouchDevice,
+  isRefreshing: pullIsRefreshing,
+  pullProgress,
+  isThresholdMet
+} = usePullToRefresh(refresh)
 
 // Sort: available items first, then out of stock
 const sortedItems = computed(() => {

@@ -21,16 +21,22 @@ const formattedTime = computed(() => {
 
   const now = new Date()
   const diff = now.getTime() - props.timestamp.getTime()
+  const seconds = Math.floor(diff / 1000)
 
-  // If less than 1 minute ago
-  if (diff < 60000) {
-    return 'Just now'
+  // If less than 10 seconds ago
+  if (seconds < 10) {
+    return 'just now'
+  }
+
+  // If less than 1 minute ago, show seconds
+  if (seconds < 60) {
+    return `${seconds}s ago`
   }
 
   // If less than 1 hour ago, show minutes
-  if (diff < 3600000) {
-    const minutes = Math.floor(diff / 60000)
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) {
+    return `${minutes}m ago`
   }
 
   // Otherwise show time

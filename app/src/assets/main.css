@@ -123,7 +123,190 @@ body {
   }
 }
 
-/* Reduced Motion Support */
+/* ============================================
+   Epic 4 - E4-S1: Card Animations
+   ============================================ */
+
+/* Card Entry Animation with Bounce */
+@keyframes cardEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  70% {
+    transform: translateY(-5px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.card-enter {
+  animation: cardEnter 400ms ease-out both;
+  animation-delay: calc(var(--stagger-index, 0) * 50ms);
+}
+
+/* Count Change Animation */
+@keyframes countChange {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+    color: var(--color-snack-purple);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.count-changed {
+  animation: countChange 250ms ease-in-out;
+}
+
+/* Skeleton Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #e5e7eb 0%,
+    #f3f4f6 50%,
+    #e5e7eb 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Dark mode skeleton shimmer */
+@media (prefers-color-scheme: dark) {
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      #374151 0%,
+      #4b5563 50%,
+      #374151 100%
+    );
+    background-size: 200% 100%;
+  }
+}
+
+/* ============================================
+   Epic 4 - E4-S2: Low Stock Warning Effects
+   ============================================ */
+
+/* Low Stock Pulse Animation */
+@keyframes lowStockPulse {
+  0%, 100% {
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1),
+                0 2px 4px -2px rgba(139, 92, 246, 0.1),
+                0 0 0 0 rgba(249, 115, 22, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1),
+                0 2px 4px -2px rgba(139, 92, 246, 0.1),
+                0 0 0 8px rgba(249, 115, 22, 0);
+  }
+}
+
+.low-stock-pulse {
+  animation: lowStockPulse 2.5s ease-in-out 3;
+}
+
+/* Going Fast indicator styling */
+.going-fast {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-warning-orange);
+  margin-top: 0.25rem;
+}
+
+/* ============================================
+   Epic 4 - E4-S3: Refresh Indicator Animations
+   ============================================ */
+
+/* Refresh spin animation */
+@keyframes refreshSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.refresh-spinning {
+  animation: refreshSpin 1s linear infinite;
+}
+
+/* Success checkmark flash */
+@keyframes successFlash {
+  0% { opacity: 0; transform: scale(0.5); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+.success-flash {
+  animation: successFlash 600ms ease-out forwards;
+}
+
+/* Error shake animation */
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.error-shake {
+  animation: errorShake 400ms ease-in-out;
+}
+
+/* ============================================
+   Epic 4 - E4-S4: Pull-to-Refresh
+   ============================================ */
+
+/* Pull indicator container */
+.pull-indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* Pull indicator icon */
+.pull-indicator-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease-out;
+}
+
+.dark .pull-indicator-icon {
+  background: #2d2640;
+}
+
+/* Prevent browser pull-to-refresh */
+html {
+  overscroll-behavior-y: contain;
+}
+
+/* ============================================
+   Reduced Motion Support
+   ============================================ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -131,5 +314,25 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Ensure cards are still visible */
+  .card-enter {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Static skeleton background */
+  .skeleton-shimmer {
+    animation: none;
+    background: #e5e7eb;
+  }
+
+  /* Static glow for low stock */
+  .low-stock-pulse {
+    animation: none;
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1),
+                0 2px 4px -2px rgba(139, 92, 246, 0.1),
+                0 0 0 4px rgba(249, 115, 22, 0.3);
   }
 }
