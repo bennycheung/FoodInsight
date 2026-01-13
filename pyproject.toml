@@ -25,9 +25,8 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
-rpi = [
-    "picamera2>=0.3.0",
-]
+# rpi dependencies installed manually on Raspberry Pi (not in lockfile)
+# rpi = ["picamera2>=0.3.0"]
 
 [project.scripts]
 foodinsight = "main:main"
