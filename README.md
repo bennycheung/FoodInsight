@@ -295,6 +295,18 @@ Access the admin portal at `http://<device-ip>/`
 - Monitor inventory counts
 - Check detection FPS and status
 
+![Edge Admin Dashboard](images/FoodInsight_Admin_Dashboard_Full.png)
+
+*Edge Admin Dashboard: Real-time detection view showing camera feed with YOLO11 bounding boxes, detection status cards (45.3 FPS), device information, persisted inventory counts, and recent events log.*
+
+#### ROI Configuration
+
+Configure the detection region to focus on specific areas:
+
+![ROI Configuration](images/FoodInsight_Test_Admin_ROI_UI.png)
+
+*ROI Configuration UI: Draw a detection region on the camera snapshot to limit inference to the shelf area. Only objects within the purple boundary will be tracked.*
+
 ## Project Structure
 
 ```
@@ -336,9 +348,13 @@ Three services available for local development testing:
 
 ### Consumer PWA
 
-![PWA Screenshot](images/FoodInsight_PWA_Screenshot.png)
+![PWA Screenshot - Available Items](images/FoodInsight_Test_App_01.png)
 
-*The FoodInsight PWA displays current meal status as a grid of cards. Green indicates available dishes with counts. Gray indicates finished items.*
+*Consumer PWA showing available inventory: Real-time display of detected items with counts, status badges, and food-specific emoji icons. Green borders indicate items in stock.*
+
+![PWA Screenshot - Empty Items](images/FoodInsight_Test_App_02.png)
+
+*Consumer PWA with empty inventory: Items marked as "Come back soon!" when out of stock. Each food class displays its corresponding emoji (🍶 Bottle, 🍩 Donut, 🍊 Orange).*
 
 **Start all services:**
 ```bash
