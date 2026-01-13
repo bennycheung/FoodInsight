@@ -165,25 +165,90 @@ const ariaLabel = computed(() => {
   }
 })
 
-// Map item names to emojis
+// Map item names to emojis (lowercase keys for case-insensitive lookup)
 const emojiMap: Record<string, string> = {
+  // Snacks
+  chips: '🥔',
   chips_bag: '🥔',
+  candy: '🍬',
   candy_bar: '🍫',
+  chocolate: '🍫',
   granola_bar: '🥜',
-  soda_can: '🥤',
-  water_bottle: '💧',
-  energy_drink: '⚡',
+  cookies: '🍪',
   cookies_pack: '🍪',
+  cookie: '🍪',
+  nuts: '🥜',
   nuts_pack: '🥜',
+  popcorn: '🍿',
+  pretzel: '🥨',
+  donut: '🍩',
+  doughnut: '🍩',
+  muffin: '🧁',
+  cake: '🍰',
+  ice_cream: '🍦',
+
+  // Drinks
+  bottle: '🍶',
+  water_bottle: '💧',
+  water: '💧',
+  soda: '🥤',
+  soda_can: '🥤',
+  can: '🥤',
+  juice: '🧃',
+  coffee: '☕',
+  tea: '🍵',
+  energy_drink: '⚡',
+  milk: '🥛',
+  beer: '🍺',
+  wine: '🍷',
+
+  // Fruits
   apple: '🍎',
   banana: '🍌',
   orange: '🍊',
+  lemon: '🍋',
+  grape: '🍇',
+  grapes: '🍇',
+  strawberry: '🍓',
+  watermelon: '🍉',
+  peach: '🍑',
+  pear: '🍐',
+  cherry: '🍒',
+  pineapple: '🍍',
+  kiwi: '🥝',
+  avocado: '🥑',
+
+  // Vegetables
+  carrot: '🥕',
+  corn: '🌽',
+  tomato: '🍅',
+  broccoli: '🥦',
+  cucumber: '🥒',
+  pepper: '🌶️',
+
+  // Prepared foods
+  sandwich: '🥪',
+  burger: '🍔',
+  pizza: '🍕',
+  hotdog: '🌭',
+  hot_dog: '🌭',
+  taco: '🌮',
+  burrito: '🌯',
+  fries: '🍟',
+
+  // Other
+  egg: '🥚',
+  bread: '🍞',
+  cheese: '🧀',
+  meat: '🥩',
+
   default: '🍿'
 }
 
-const emoji = computed(() =>
-  emojiMap[props.item.name] || emojiMap.default
-)
+const emoji = computed(() => {
+  const name = props.item.name.toLowerCase().replace(/\s+/g, '_')
+  return emojiMap[name] || emojiMap.default
+})
 
 const displayName = computed(() =>
   props.item.name
