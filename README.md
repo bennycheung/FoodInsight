@@ -6,6 +6,16 @@ Smart food inventory monitoring system using YOLO11 object detection on edge dev
 
 *Edge AI food detection: A Raspberry Pi camera monitors a dining table, detecting Japanese dishes in real-time with YOLO11. Each dish receives a bounding box and confidence score, all processed locally.*
 
+## Blog Posts
+
+For detailed walkthroughs and technical deep-dives, check out these companion blog posts:
+
+- [From YOLO v2 to YOLO11: Food Detection Evolution](https://bennycheung.github.io/from-yolo-v2-to-yolo11-food-detection-evolution) - The journey of training custom food detection models, from early YOLO versions to the latest YOLO11, including dataset preparation and performance comparisons.
+
+- [FoodInsight: Edge AI Food Monitoring](https://bennycheung.github.io/foodinsight-edge-ai-food-monitoring) - Complete system architecture and implementation guide for building a privacy-first, local-first food inventory monitoring system with edge AI.
+
+---
+
 ## Project Status: MVP COMPLETE
 
 All components implemented and tested locally (2026-01-11).
