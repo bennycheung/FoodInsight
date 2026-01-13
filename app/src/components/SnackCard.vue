@@ -1,54 +1,93 @@
 <template>
-  <div
-    class="rounded-lg p-4 shadow-sm transition-all"
-    :class="cardClasses"
+  <article
+    class="rounded-2xl p-4 min-h-[160px] shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5 flex flex-col items-center text-center"
+    :class="cardGradientClass"
+    :aria-label="`${displayName}: ${ariaLabel}`"
   >
-    <div class="flex items-center justify-between mb-2">
-      <span class="text-2xl">{{ emoji }}</span>
-      <span
-        class="px-2 py-1 text-xs rounded-full"
-        :class="statusClasses"
-      >
-        {{ statusText }}
-      </span>
-    </div>
+    <!-- Large Centered Emoji -->
+    <span class="text-5xl mb-2" aria-hidden="true">{{ emoji }}</span>
 
-    <h3 class="font-medium text-gray-900 truncate" :title="item.name">
+    <!-- Snack Name -->
+    <h3 class="font-display font-bold text-gray-900 dark:text-gray-100 truncate w-full" :title="item.name">
       {{ displayName }}
     </h3>
 
-    <div class="mt-2">
-      <span v-if="item.inStock" class="text-3xl font-bold text-gray-900">
-        {{ item.count }}
-      </span>
-      <span v-else class="text-lg text-gray-400">
-        Out of Stock
-      </span>
+    <!-- Prominent Count Display -->
+    <div class="flex-1 flex items-center justify-center my-2">
+      <template v-if="item.count > 0">
+        <span class="text-count-display text-gray-900 dark:text-white">
+          {{ item.count }}
+        </span>
+      </template>
+      <template v-else>
+        <span class="text-base text-gray-500 dark:text-gray-400 italic">
+          Come back soon!
+        </span>
+      </template>
     </div>
-  </div>
+
+    <!-- Status Badge Component -->
+    <StatusBadge :status="statusType" :count="item.count" />
+  </article>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { InventoryItem } from '@/types/inventory'
+import StatusBadge, { type StatusType } from './StatusBadge.vue'
 
 const props = defineProps<{
   item: InventoryItem
 }>()
 
-const cardClasses = computed(() => ({
-  'bg-white': props.item.inStock,
-  'bg-gray-100 opacity-60': !props.item.inStock
-}))
+// Stock level computation: high (>3), low (1-3), out (0)
+const stockLevel = computed(() => {
+  if (props.item.count === 0) return 'out'
+  if (props.item.count <= 3) return 'low'
+  return 'high'
+})
 
-const statusClasses = computed(() => ({
-  'bg-green-100 text-green-800': props.item.inStock,
-  'bg-gray-200 text-gray-600': !props.item.inStock
-}))
+// Map stock level to status type
+const statusType = computed<StatusType>(() => {
+  switch (stockLevel.value) {
+    case 'high':
+      return 'available'
+    case 'low':
+      return 'low'
+    case 'out':
+      return 'out'
+    default:
+      return 'available'
+  }
+})
 
-const statusText = computed(() =>
-  props.item.inStock ? 'Available' : 'Empty'
-)
+// Card gradient based on stock level
+const cardGradientClass = computed(() => {
+  switch (stockLevel.value) {
+    case 'high':
+      return 'bg-card-available'
+    case 'low':
+      return 'bg-card-warning'
+    case 'out':
+      return 'bg-card-empty grayscale-[30%]'
+    default:
+      return 'bg-card-available'
+  }
+})
+
+// ARIA label for accessibility
+const ariaLabel = computed(() => {
+  switch (stockLevel.value) {
+    case 'high':
+      return `${props.item.count} items available`
+    case 'low':
+      return `Only ${props.item.count} items left`
+    case 'out':
+      return 'Out of stock'
+    default:
+      return `${props.item.count} items available`
+  }
+})
 
 // Map item names to emojis
 const emojiMap: Record<string, string> = {

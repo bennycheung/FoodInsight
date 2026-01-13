@@ -1,9 +1,17 @@
 <template>
-  <div class="min-h-screen bg-gray-100 pb-12">
-    <header class="bg-white shadow-sm">
-      <div class="max-w-4xl mx-auto px-4 py-4">
-        <h1 class="text-2xl font-bold text-gray-900">FoodInsight</h1>
-        <p class="text-sm text-gray-500">{{ location }}</p>
+  <div class="min-h-screen bg-gray-100 dark:bg-bg-dark pb-12 font-body">
+    <!-- Gradient Header -->
+    <header class="bg-header-gradient">
+      <!-- Mobile: full-width, Desktop: rounded with margin -->
+      <div class="max-w-4xl mx-auto px-4 py-4 sm:py-5 sm:mt-4 sm:mx-4 lg:mx-auto sm:rounded-2xl">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
+          <h1 class="text-app-title text-white drop-shadow-sm">
+            🍿 FoodInsight
+          </h1>
+          <p class="text-sm sm:text-base text-white/80 font-medium">
+            📍 {{ location }}
+          </p>
+        </div>
       </div>
     </header>
 
