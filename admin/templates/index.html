@@ -3,313 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FoodInsight Admin</title>
+    <meta name="theme-color" content="#8b5cf6" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1a1625" media="(prefers-color-scheme: dark)">
+    <title>FoodInsight Admin Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/htmx.min.js"></script>
-    <style>
-        :root {
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --accent: #0f3460;
-            --highlight: #e94560;
-            --text: #eaeaea;
-            --success: #4ade80;
-            --warning: #fbbf24;
-            --error: #f87171;
-            --info: #60a5fa;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text);
-            padding: 20px;
-            min-height: 100vh;
-        }
-
-        h1 {
-            color: var(--highlight);
-            margin-bottom: 20px;
-            font-size: 1.8rem;
-        }
-
-        h2 {
-            color: var(--text);
-            margin: 20px 0 10px;
-            font-size: 1.2rem;
-        }
-
-        h3 {
-            color: var(--text);
-            margin: 15px 0 8px;
-            font-size: 1rem;
-            opacity: 0.9;
-        }
-
-        .status-bar {
-            background: var(--bg-secondary);
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 30px;
-            flex-wrap: wrap;
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-
-        .status-indicator.offline {
-            background: var(--error);
-        }
-
-        .status-indicator.motion {
-            background: var(--warning);
-            animation: pulse 1s infinite;
-        }
-
-        .status-indicator.backend {
-            background: var(--info);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .grid-layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        @media (max-width: 900px) {
-            .grid-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .preview-container {
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            padding: 10px;
-            display: inline-block;
-        }
-
-        .preview {
-            max-width: 100%;
-            width: 640px;
-            height: auto;
-            border-radius: 4px;
-        }
-
-        .card {
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            padding: 15px;
-        }
-
-        .inventory {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .item {
-            background: var(--bg-primary);
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            border: 2px solid transparent;
-        }
-
-        .item.in-stock {
-            border-color: var(--success);
-        }
-
-        .item.out-of-stock {
-            border-color: var(--error);
-            opacity: 0.6;
-        }
-
-        .item .count {
-            font-size: 1.5rem;
-            font-weight: bold;
-            display: block;
-        }
-
-        .item .name {
-            font-size: 0.85rem;
-            opacity: 0.8;
-        }
-
-        .events-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .event-item {
-            padding: 8px 12px;
-            margin: 5px 0;
-            background: var(--bg-primary);
-            border-radius: 4px;
-            font-size: 0.85rem;
-            border-left: 3px solid var(--accent);
-        }
-
-        .event-item.added {
-            border-left-color: var(--success);
-        }
-
-        .event-item.taken {
-            border-left-color: var(--warning);
-        }
-
-        .event-time {
-            opacity: 0.6;
-            font-size: 0.75rem;
-        }
-
-        .device-info {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 8px 15px;
-            font-size: 0.9rem;
-        }
-
-        .device-info dt {
-            opacity: 0.7;
-        }
-
-        .device-info dd {
-            font-weight: 500;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        .nav-link {
-            display: inline-block;
-            padding: 10px 20px;
-            background: var(--accent);
-            color: var(--text);
-            text-decoration: none;
-            border-radius: 4px;
-        }
-
-        .nav-link:hover {
-            background: var(--highlight);
-        }
-
-        .nav-link.secondary {
-            background: var(--bg-secondary);
-            border: 1px solid var(--accent);
-        }
-
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid var(--accent);
-            font-size: 0.9rem;
-            opacity: 0.7;
-        }
-    </style>
 </head>
 <body>
-    <h1>FoodInsight Edge Admin</h1>
+    <!-- Skip to main content link for keyboard users -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
 
-    <div class="status-bar" hx-get="/status" hx-trigger="every 2s" hx-swap="innerHTML">
-        <div class="status-item">
-            <div class="status-indicator {% if status.status == 'running' %}{% else %}offline{% endif %}"></div>
-            <span>Detection: {{ status.status }}</span>
-        </div>
-        <div class="status-item">
-            <span>FPS: {{ status.fps }}</span>
-        </div>
-        <div class="status-item">
-            <span>Frames: {{ status.frame_count }}</span>
-        </div>
-        <div class="status-item">
-            <div class="status-indicator {% if status.motion_active %}motion{% else %}{% endif %}"></div>
-            <span>Motion: {% if status.motion_active %}Active{% else %}Idle{% endif %}</span>
-        </div>
-        <div class="status-item" hx-get="/api/backend-status" hx-trigger="every 5s" hx-swap="innerHTML">
-            <div class="status-indicator backend"></div>
-            <span>Backend: checking...</span>
-        </div>
+    <header role="banner">
+        <nav class="admin-nav" role="navigation" aria-label="Main navigation">
+            <div class="admin-nav__brand">
+                <span class="admin-nav__logo">FoodInsight</span>
+                <span class="admin-nav__subtitle">Edge Admin</span>
+            </div>
+            <button class="admin-nav__toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="main-navigation">
+                <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                </svg>
+            </button>
+            <ul class="admin-nav__list" id="main-navigation">
+                <li><a href="/" class="admin-nav__link admin-nav__link--active" aria-current="page">Dashboard</a></li>
+                <li><a href="/roi" class="admin-nav__link" aria-label="Configure detection region">ROI Config</a></li>
+                <li><a href="/status" class="admin-nav__link">Status</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main role="main" id="main-content">
+
+    <h1>FoodInsight Edge Admin Dashboard</h1>
+
+    <!-- ARIA Live Region for Status Announcements -->
+    <div aria-live="polite" aria-atomic="true" class="sr-only" id="status-announcer"></div>
+
+    <!-- Dashboard Status Cards -->
+    <section aria-labelledby="status-heading">
+        <h2 id="status-heading" class="sr-only">System Status Overview</h2>
+        <div class="dashboard-cards">
+            <!-- Detection Status Card -->
+            <article class="status-card status-card--detection" hx-get="/status-cards/detection" hx-trigger="every 2s" hx-swap="innerHTML" aria-labelledby="detection-status-title">
+                <div class="status-card__header">
+                    <div class="status-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--snack-purple);" focusable="false">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </div>
+                    <div class="status-card__content">
+                        <h3 class="status-card__title" id="detection-status-title">Detection</h3>
+                    </div>
+                </div>
+                <div class="status-card__value" aria-label="{{ "%.1f"|format(status.fps) }} frames per second">{{ "%.1f"|format(status.fps) }} FPS</div>
+                <div class="status-card__meta">
+                    <div class="status-badge status-badge--{% if status.status == 'running' %}success{% else %}error{% endif %}" role="status" aria-label="Detection system {% if status.status == 'running' %}running{% else %}stopped{% endif %}">
+                        <span class="status-badge__icon" aria-hidden="true">{% if status.status == 'running' %}✓{% else %}✕{% endif %}</span>
+                        <span>{{ status.status|capitalize }}</span>
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 4px;">
+                        <span class="sr-only">Total frames processed: </span>{{ status.frame_count }} frames processed
+                    </div>
+                </div>
+            </article>
+
+        <!-- Inventory Summary Card -->
+        <article class="status-card status-card--inventory" hx-get="/status-cards/inventory" hx-trigger="every 2s" hx-swap="innerHTML" aria-labelledby="inventory-status-title">
+            <div class="status-card__header">
+                <div class="status-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--fresh-green);" focusable="false">
+                        <path d="M20 7h-4V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1zM10 4h4v3h-4V4zm10 15H4V9h16v10z"></path>
+                    </svg>
+                </div>
+                <div class="status-card__content">
+                    <h3 class="status-card__title" id="inventory-status-title">Inventory</h3>
+                </div>
+            </div>
+            {% set total_items = status.inventory.values()|sum %}
+            {% set in_stock = status.inventory.values()|select("greaterthan", 0)|list|length %}
+            {% set empty = status.inventory|length - in_stock %}
+            <div class="status-card__value" aria-label="{{ total_items }} total items in inventory">{{ total_items }} Items</div>
+            <div class="inventory-breakdown" role="list" aria-label="Inventory breakdown">
+                <div class="inventory-breakdown__item" role="listitem">
+                    <span class="inventory-breakdown__label">In Stock</span>
+                    <span class="inventory-breakdown__value inventory-breakdown__value--in-stock" aria-label="{{ in_stock }} products in stock">{{ in_stock }}</span>
+                </div>
+                <div class="inventory-breakdown__item" role="listitem">
+                    <span class="inventory-breakdown__label">Empty</span>
+                    <span class="inventory-breakdown__value inventory-breakdown__value--empty" aria-label="{{ empty }} products empty">{{ empty }}</span>
+                </div>
+            </div>
+        </article>
+
+        <!-- System Health Card -->
+        <article class="status-card status-card--health" hx-get="/status-cards/health" hx-trigger="every 5s" hx-swap="innerHTML" aria-labelledby="health-status-title">
+            <div class="status-card__header">
+                <div class="status-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--info-blue);" focusable="false">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg>
+                </div>
+                <div class="status-card__content">
+                    <h3 class="status-card__title" id="health-status-title">System Health</h3>
+                </div>
+            </div>
+            <div class="status-card__value" role="status" aria-live="polite">Online</div>
+            <div class="health-indicators" role="list" aria-label="System health indicators">
+                <div class="health-indicator" role="listitem">
+                    <span class="health-indicator__label">Motion</span>
+                    <div class="health-indicator__status">
+                        <div class="health-indicator__dot {% if status.motion_active %}health-indicator__dot--warning{% endif %}" aria-hidden="true"></div>
+                        <span class="health-indicator__value" role="status">{% if status.motion_active %}Active{% else %}Idle{% endif %}</span>
+                    </div>
+                </div>
+                <div class="health-indicator" role="listitem">
+                    <span class="health-indicator__label">Last Detection</span>
+                    <span class="health-indicator__value">{{ status.last_detection or 'Never' }}</span>
+                </div>
+            </div>
+        </article>
     </div>
+    </section>
 
-    <div class="grid-layout">
+    <!-- Device Information - Static, loaded once -->
+    <section class="card card--compact" aria-labelledby="device-info-heading" style="margin-bottom: var(--space-md);">
+        <h2 id="device-info-heading">Device Information</h2>
+        <div hx-get="/api/device-info" hx-trigger="load" hx-swap="innerHTML">
+            <p>Loading device info...</p>
+        </div>
+    </section>
+
+    <section class="camera-section">
         <div>
-            <h2>Camera Preview</h2>
-            <div class="preview-container">
-                <img class="preview" src="/preview" alt="Camera feed">
+            <div class="camera-preview" role="region" aria-label="Live camera feed">
+                <div class="camera-preview__header">
+                    <span class="camera-preview__title">Camera Feed</span>
+                    <span class="live-badge" role="status" aria-label="Camera feed is live">
+                        <span class="live-badge__dot" aria-hidden="true"></span>
+                        LIVE
+                    </span>
+                </div>
+                <div class="camera-preview__stream">
+                    <img src="/preview" alt="Live camera feed showing shelf inventory" />
+                </div>
+                <div class="camera-preview__footer">
+                    <span><span class="sr-only">Camera resolution: </span>1920×1080 @ 30 FPS</span>
+                </div>
             </div>
 
-            <h3>Live Inventory (Detection)</h3>
-            <div class="inventory" hx-get="/inventory-partial" hx-trigger="every 5s" hx-swap="innerHTML">
+            <h3 id="live-inventory-heading">Live Inventory (Detection)</h3>
+            <div class="inventory" hx-get="/inventory-partial" hx-trigger="every 5s" hx-swap="innerHTML" role="list" aria-labelledby="live-inventory-heading" aria-live="polite">
                 {% for item, count in status.inventory.items() %}
-                <div class="item {% if count > 0 %}in-stock{% else %}out-of-stock{% endif %}">
-                    <span class="count">{{ count }}</span>
+                <div class="item {% if count > 0 %}in-stock{% else %}out-of-stock{% endif %}" role="listitem">
+                    <span class="count" aria-label="{{ count }} items of {{ item }}">{{ count }}</span>
                     <span class="name">{{ item }}</span>
                 </div>
                 {% endfor %}
                 {% if not status.inventory %}
-                <div class="item">No items detected</div>
+                <div class="item" role="listitem">No items detected</div>
                 {% endif %}
             </div>
         </div>
 
-        <div>
-            <h2>Device Information</h2>
-            <div class="card" hx-get="/api/device-info" hx-trigger="load" hx-swap="innerHTML">
-                <p>Loading device info...</p>
-            </div>
+        <div class="sidebar-stack">
+            <section class="card card--with-header" aria-labelledby="persisted-inventory-heading">
+                <div class="card__header">
+                    <span class="card__title" id="persisted-inventory-heading">Persisted Inventory</span>
+                </div>
+                <div class="card__body" id="persisted-inventory" hx-get="/api/inventory-data" hx-trigger="every 10s" hx-swap="innerHTML" aria-live="polite">
+                    <p>Loading inventory from database...</p>
+                </div>
+            </section>
 
-            <h2>Persisted Inventory</h2>
-            <div class="card" id="persisted-inventory" hx-get="/api/inventory-data" hx-trigger="every 10s" hx-swap="innerHTML">
-                <p>Loading inventory from database...</p>
-            </div>
-
-            <h2>Recent Events</h2>
-            <div class="card">
-                <div class="events-list" hx-get="/api/events?limit=10" hx-trigger="every 5s" hx-swap="innerHTML">
+            <section class="card card--with-header" aria-labelledby="recent-events-heading">
+                <div class="card__header">
+                    <span class="card__title" id="recent-events-heading">Recent Events</span>
+                </div>
+                <div class="card__body events-list" hx-get="/api/events?limit=10" hx-trigger="every 5s" hx-swap="innerHTML" role="log" aria-live="polite">
                     <p>Loading events...</p>
                 </div>
-            </div>
+            </section>
         </div>
-    </div>
+    </section>
 
-    <div class="nav-links">
-        <a class="nav-link" href="/roi">Configure Detection Region (ROI)</a>
-        <a class="nav-link secondary" href="/api/device-info" target="_blank">Device Info API</a>
-        <a class="nav-link secondary" href="/api/inventory-data" target="_blank">Inventory API</a>
-    </div>
+    <nav class="nav-links" aria-label="Page actions">
+        <a class="nav-link" href="/roi" aria-label="Configure detection region">Configure Detection Region (ROI)</a>
+        <a class="nav-link secondary" href="/api/device-info" target="_blank" rel="noopener noreferrer" aria-label="View device info API (opens in new tab)">Device Info API</a>
+        <a class="nav-link secondary" href="/api/inventory-data" target="_blank" rel="noopener noreferrer" aria-label="View inventory API (opens in new tab)">Inventory API</a>
+    </nav>
 
-    <div class="footer">
-        <p>FoodInsight Edge Device | Machine ID: foodinsight-edge-001</p>
-        <p>Last Detection: <span id="last-detection">{{ status.last_detection or 'Never' }}</span></p>
-    </div>
+    </main>
+
+    <footer class="footer" role="contentinfo">
+        <p>FoodInsight Edge Device | Machine ID: <span>foodinsight-edge-001</span></p>
+        <p>Last Detection: <span id="last-detection" role="status">{{ status.last_detection or 'Never' }}</span></p>
+    </footer>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script>
+        // Mobile menu toggle
+        document.querySelector('.admin-nav__toggle')?.addEventListener('click', function() {
+            const nav = document.querySelector('.admin-nav__list');
+            const isOpen = nav.classList.toggle('is-open');
+            this.setAttribute('aria-expanded', isOpen);
+        });
+
+        // Toast notification helper function
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast--${type}`;
+            toast.textContent = message;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+    </script>
 </body>
 </html>

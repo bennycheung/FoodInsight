@@ -3,174 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ROI Configuration - FoodInsight</title>
+    <meta name="theme-color" content="#8b5cf6" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1a1625" media="(prefers-color-scheme: dark)">
+    <title>ROI Configuration - FoodInsight Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/htmx.min.js"></script>
-    <style>
-        :root {
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --accent: #0f3460;
-            --highlight: #e94560;
-            --text: #eaeaea;
-            --success: #4ade80;
-            --warning: #fbbf24;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text);
-            padding: 20px;
-            min-height: 100vh;
-        }
-
-        h1 {
-            color: var(--highlight);
-            margin-bottom: 10px;
-            font-size: 1.8rem;
-        }
-
-        p {
-            margin-bottom: 20px;
-            opacity: 0.8;
-        }
-
-        #roi-container {
-            position: relative;
-            display: inline-block;
-            background: var(--bg-secondary);
-            padding: 10px;
-            border-radius: 8px;
-            cursor: crosshair;
-        }
-
-        #preview {
-            max-width: 100%;
-            width: 640px;
-            display: block;
-            border-radius: 4px;
-        }
-
-        #roi-overlay {
-            position: absolute;
-            border: 3px dashed var(--success);
-            background: rgba(74, 222, 128, 0.1);
-            pointer-events: none;
-            display: none;
-        }
-
-        .controls {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        #save-btn {
-            background: var(--success);
-            color: #000;
-        }
-
-        #save-btn:hover {
-            background: #22c55e;
-        }
-
-        #reset-btn {
-            background: var(--warning);
-            color: #000;
-        }
-
-        #reset-btn:hover {
-            background: #f59e0b;
-        }
-
-        .nav-link {
-            padding: 12px 24px;
-            background: var(--accent);
-            color: var(--text);
-            text-decoration: none;
-            border-radius: 4px;
-        }
-
-        .nav-link:hover {
-            background: var(--highlight);
-        }
-
-        #coordinates {
-            margin-top: 15px;
-            padding: 10px 15px;
-            background: var(--bg-secondary);
-            border-radius: 4px;
-            font-family: monospace;
-        }
-
-        #message {
-            margin-top: 15px;
-            padding: 10px 15px;
-            border-radius: 4px;
-            display: none;
-        }
-
-        #message.success {
-            display: block;
-            background: rgba(74, 222, 128, 0.2);
-            border: 1px solid var(--success);
-        }
-
-        #message.error {
-            display: block;
-            background: rgba(248, 113, 113, 0.2);
-            border: 1px solid #f87171;
-        }
-
-        .current-roi {
-            margin-top: 15px;
-            padding: 10px 15px;
-            background: var(--bg-secondary);
-            border-radius: 4px;
-            border-left: 3px solid var(--success);
-        }
-    </style>
 </head>
 <body>
-    <h1>Configure Detection Region</h1>
-    <p>Click and drag to select the snack shelf area. Only this region will be processed for detection.</p>
+    <!-- Skip to main content link for keyboard users -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
 
-    <div id="roi-container">
-        <img id="preview" src="/preview/snapshot" alt="Camera snapshot">
-        <div id="roi-overlay"></div>
-    </div>
+    <header role="banner">
+        <nav class="admin-nav" role="navigation" aria-label="Main navigation">
+            <div class="admin-nav__brand">
+                <span class="admin-nav__logo">FoodInsight</span>
+                <span class="admin-nav__subtitle">Edge Admin</span>
+            </div>
+            <button class="admin-nav__toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="main-navigation">
+                <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                </svg>
+            </button>
+            <ul class="admin-nav__list" id="main-navigation">
+                <li><a href="/" class="admin-nav__link">Dashboard</a></li>
+                <li><a href="/roi" class="admin-nav__link admin-nav__link--active" aria-current="page">ROI Config</a></li>
+                <li><a href="/status" class="admin-nav__link">Status</a></li>
+            </ul>
+        </nav>
+    </header>
 
-    <div id="coordinates">ROI: <span id="roi-coords">Click and drag to select</span></div>
+    <main role="main" id="main-content">
+        <h1>Configure Detection Region</h1>
+        <p>Click and drag to select the snack shelf area. Only this region will be processed for detection.</p>
 
-    {% if roi %}
-    <div class="current-roi">
-        Current ROI: ({{ roi.x1 }}, {{ roi.y1 }}) to ({{ roi.x2 }}, {{ roi.y2 }})
-    </div>
-    {% endif %}
+        <section class="camera-section" aria-labelledby="roi-config-heading">
+            <h2 id="roi-config-heading" class="sr-only">Region of Interest Configuration</h2>
+            <div id="roi-container" role="img" aria-label="Camera preview for selecting detection region">
+                <img id="preview" src="/preview/snapshot" alt="Camera snapshot for ROI configuration">
+                <div id="roi-overlay" role="presentation" aria-hidden="true"></div>
+            </div>
 
-    <div class="controls">
-        <button id="save-btn">Save Configuration</button>
-        <button id="reset-btn">Reset to Full Frame</button>
-        <a class="nav-link" href="/">Back to Dashboard</a>
-    </div>
+            <div>
+                <div id="coordinates" aria-live="polite" aria-atomic="true">
+                    <span class="sr-only">Selected region coordinates: </span>
+                    <span id="roi-coords">Click and drag to select</span>
+                </div>
 
-    <div id="message"></div>
+                {% if roi %}
+                <div class="current-roi" role="status">
+                    <strong>Current ROI:</strong> ({{ roi.x1 }}, {{ roi.y1 }}) to ({{ roi.x2 }}, {{ roi.y2 }})
+                </div>
+                {% endif %}
+
+                <div class="controls">
+                    <button id="save-btn" class="btn-primary" aria-label="Save region of interest configuration">Save Configuration</button>
+                    <button id="reset-btn" class="btn-secondary" aria-label="Reset region of interest to full frame">Reset to Full Frame</button>
+                </div>
+
+                <div id="message" role="alert" aria-live="assertive"></div>
+
+                <nav class="nav-links" aria-label="Page navigation">
+                    <a class="nav-link" href="/" aria-label="Return to dashboard">Back to Dashboard</a>
+                </nav>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
     <script>
         let startX, startY, isDrawing = false;
@@ -235,9 +138,24 @@
             }, 3000);
         }
 
+        // Toast notification helper function
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast--${type}`;
+            toast.textContent = message;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
         document.getElementById('save-btn').addEventListener('click', async () => {
             if (!roiX1 && roiX1 !== 0) {
-                showMessage('Please draw a region first', 'error');
+                showToast('Please draw a region first', 'error');
                 return;
             }
 
@@ -250,12 +168,12 @@
                 const data = await response.json();
 
                 if (data.status === 'ok') {
-                    showMessage('ROI saved successfully!', 'success');
+                    showToast('ROI saved successfully!', 'success');
                 } else {
-                    showMessage(data.message || 'Failed to save', 'error');
+                    showToast(data.message || 'Failed to save', 'error');
                 }
             } catch (e) {
-                showMessage('Error saving ROI: ' + e.message, 'error');
+                showToast('Error saving ROI: ' + e.message, 'error');
             }
         });
 
@@ -270,12 +188,12 @@
                 if (data.status === 'ok') {
                     overlay.style.display = 'none';
                     coordsDisplay.textContent = 'Full frame (no ROI)';
-                    showMessage('ROI reset to full frame', 'success');
+                    showToast('ROI reset to full frame', 'success');
                 } else {
-                    showMessage(data.message || 'Failed to reset', 'error');
+                    showToast(data.message || 'Failed to reset', 'error');
                 }
             } catch (e) {
-                showMessage('Error resetting ROI: ' + e.message, 'error');
+                showToast('Error resetting ROI: ' + e.message, 'error');
             }
         });
 
@@ -285,6 +203,13 @@
                 preview.src = '/preview/snapshot?' + Date.now();
             }
         }, 5000);
+
+        // Mobile menu toggle
+        document.querySelector('.admin-nav__toggle')?.addEventListener('click', function() {
+            const nav = document.querySelector('.admin-nav__list');
+            const isOpen = nav.classList.toggle('is-open');
+            this.setAttribute('aria-expanded', isOpen);
+        });
     </script>
 </body>
 </html>

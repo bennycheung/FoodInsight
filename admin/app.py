@@ -104,6 +104,113 @@ def register_routes(app: Flask) -> None:
             html = '<div class="item">No items detected</div>'
         return html
 
+    # ----- Status Card Partial Endpoints -----
+
+    @app.route("/status-cards/detection")
+    def detection_card():
+        """HTMX partial for detection status card."""
+        fps = _status_data.get("fps", 0.0)
+        status = _status_data.get("status", "unknown")
+        frame_count = _status_data.get("frame_count", 0)
+
+        badge_class = "success" if status == "running" else "error"
+        badge_icon = "✓" if status == "running" else "✕"
+
+        html = f'''
+            <div class="status-card__header">
+                <div class="status-card__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--snack-purple);">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </div>
+                <div class="status-card__content">
+                    <h3 class="status-card__title">Detection</h3>
+                </div>
+            </div>
+            <div class="status-card__value">{fps:.1f} FPS</div>
+            <div class="status-card__meta">
+                <div class="status-badge status-badge--{badge_class}">
+                    <span class="status-badge__icon">{badge_icon}</span>
+                    <span>{status.capitalize()}</span>
+                </div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 4px;">
+                    {frame_count} frames processed
+                </div>
+            </div>
+        '''
+        return html
+
+    @app.route("/status-cards/inventory")
+    def inventory_card():
+        """HTMX partial for inventory summary card."""
+        inventory = _status_data.get("inventory", {})
+        total_items = sum(inventory.values())
+        in_stock = sum(1 for count in inventory.values() if count > 0)
+        empty = len(inventory) - in_stock
+
+        html = f'''
+            <div class="status-card__header">
+                <div class="status-card__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--fresh-green);">
+                        <path d="M20 7h-4V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1zM10 4h4v3h-4V4zm10 15H4V9h16v10z"></path>
+                    </svg>
+                </div>
+                <div class="status-card__content">
+                    <h3 class="status-card__title">Inventory</h3>
+                </div>
+            </div>
+            <div class="status-card__value">{total_items} Items</div>
+            <div class="inventory-breakdown">
+                <div class="inventory-breakdown__item">
+                    <span class="inventory-breakdown__label">In Stock</span>
+                    <span class="inventory-breakdown__value inventory-breakdown__value--in-stock">{in_stock}</span>
+                </div>
+                <div class="inventory-breakdown__item">
+                    <span class="inventory-breakdown__label">Empty</span>
+                    <span class="inventory-breakdown__value inventory-breakdown__value--empty">{empty}</span>
+                </div>
+            </div>
+        '''
+        return html
+
+    @app.route("/status-cards/health")
+    def health_card():
+        """HTMX partial for system health card."""
+        motion_active = _status_data.get("motion_active", False)
+        last_detection = _status_data.get("last_detection", "Never")
+
+        motion_dot_class = "health-indicator__dot--warning" if motion_active else ""
+        motion_status = "Active" if motion_active else "Idle"
+
+        html = f'''
+            <div class="status-card__header">
+                <div class="status-card__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--info-blue);">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg>
+                </div>
+                <div class="status-card__content">
+                    <h3 class="status-card__title">System Health</h3>
+                </div>
+            </div>
+            <div class="status-card__value">Online</div>
+            <div class="health-indicators">
+                <div class="health-indicator">
+                    <span class="health-indicator__label">Motion</span>
+                    <div class="health-indicator__status">
+                        <div class="health-indicator__dot {motion_dot_class}"></div>
+                        <span class="health-indicator__value">{motion_status}</span>
+                    </div>
+                </div>
+                <div class="health-indicator">
+                    <span class="health-indicator__label">Last Detection</span>
+                    <span class="health-indicator__value">{last_detection}</span>
+                </div>
+            </div>
+        '''
+        return html
+
     @app.route("/roi")
     def roi_page():
         """ROI configuration page."""
